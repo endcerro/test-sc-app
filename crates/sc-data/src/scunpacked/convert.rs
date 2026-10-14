@@ -1,11 +1,13 @@
-//! Merge of `starmap.json` (tree + metadata) and `starmap_positions.json` (coordinates,
-//! system codes, jump connections) into a [`UniverseBuilder`].
+//! Merge of `starmap.json` (tree + metadata), `starmap_positions.json` (coordinates,
+//! system codes, jump connections) and aliases (curated + `labels.json`) into a
+//! [`UniverseBuilder`].
 
 use std::collections::{HashMap, HashSet};
 
 use sc_universe::{Amenity, GameUuid, JumpSpec, LocationKind, NodeSpec, UniverseBuilder, Vec3};
 
-use super::dto::{PositionEntity, PositionsFile, StarmapObject};
+use super::aliases::{self, Targets};
+use super::dto::{MissionLocations, PositionEntity, PositionsFile, StarmapObject};
 use crate::LoadOptions;
 
 /// True for names the game files leave unset (`<= PLACEHOLDER =>`, `@loc_key`, empty).
@@ -28,11 +30,13 @@ fn parse_uuid(s: &str) -> Option<GameUuid> {
     }
 }
 
+/// Returns the builder plus notes worth surfacing (curated alias drift).
 pub(crate) fn build(
     starmap: &[StarmapObject],
     positions: &PositionsFile,
+    labels: Option<&MissionLocations>,
     opts: LoadOptions,
-) -> UniverseBuilder {
+) -> (UniverseBuilder, Vec<String>) {
     // First row wins: duplicates are asteroid scatter sharing one template uuid.
     let mut pos: HashMap<&str, &PositionEntity> = HashMap::with_capacity(positions.entities.len());
     for e in &positions.entities {
@@ -143,6 +147,15 @@ pub(crate) fn build(
             raw_parent.entry(e.uuid.as_str()).or_insert(p);
         }
     }
+    // Aliases, resolved against the kept nodes. Curated first so their kind wins on
+    // duplicates.
+    let mut notes = Vec::new();
+    let targets = Targets::new(specs.iter().map(|(s, _)| (s.uuid, s.name.as_str(), s.kind)));
+    let mut alias_list = aliases::curated(&targets, &mut notes);
+    if let Some(labels) = labels {
+        alias_list.extend(aliases::from_labels(labels, &targets));
+    }
+
     let mut b = UniverseBuilder::new();
     for e in &positions.entities {
         if e.kind.as_deref() == Some("Star")
@@ -164,7 +177,10 @@ pub(crate) fn build(
             });
         }
     }
-    b
+    for (target, alias) in alias_list {
+        b.add_alias(target, alias);
+    }
+    (b, notes)
 }
 
 /// Closest ancestor (starting at `p`) that was kept as a node.

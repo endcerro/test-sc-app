@@ -66,16 +66,56 @@ Also present, unused for now: `QuantumTravel{ObstructionRadius, ArrivalRadius, A
   "… Jump Point" objects under each `… Gateway` station. Treated as bidirectional.
 - 13 entities exist only here (internal markers like `UGF_*`, type `unknown`); skipped.
 
+### `labels.json` (~11 MB) — venue aliases
+
+The game's English localisation (90 946 `key → string` entries). Only the 1 923
+`mission_location_*` strings are used: many read **"<venue> in <location>"**, which ties
+names that are not starmap objects to the location they belong to:
+
+```text
+mission_location_stanton_0299  "Riker Memorial Spaceport in Area18"
+mission_location_stanton_799   "Teasa Spaceport in Lorville"
+mission_location_nyx_003       "Cafe Musain in Levski"
+```
+
+Kept as `AliasKind::Venue` aliases of the location (`scunpacked/aliases.rs`) only when:
+
+- the venue is a proper name (not lowercase, no `a`/`an`/`the`: drops "cave",
+  "a Landing Pad Locker in Orison", "the Service Entrance in the QV Breaker Station"),
+- the venue is not itself a location name and has no nested `on` ("Building A on a Resort
+  Platform in Empyrean Park"),
+- the location resolves to exactly one kept node that is not a planet/moon/star
+  ("X **on** Hurston" means *somewhere on the planet*, not the same place, so `on` is ignored),
+- every string mentioning the venue points at the same location.
+
+On 4.10.2 that yields 15 venues (Lorville ×6, Area18 ×3, New Babbage ×2, Levski ×2,
+Orison ×1, Grim HEX ×1). Only the `mission_location_*` subset is cached
+(`<cache>/<sha>/mission_locations.json`, ~125 KB). The file is optional: if it can't be
+downloaded, loading continues with curated aliases only and a note.
+
+### Curated aliases (`crates/sc-data/data/aliases.json`)
+
+Embedded at build time. Keyed by starmap UUID (stable across patches), with the expected
+name as a sanity check (mismatch → load note). For names the game data never ties to a
+location: `NB Int. Spaceport` / `New Babbage Interstellar Spaceport` (labels only say
+"*on* microTech"), `Area 18`. The four main spaceports are also listed as a safety net.
+Re-check with `sc-companion tree --aliases` after a patch.
+
 ### Not used (yet)
 
-- `trade_locations.json`: hauling-mission sub-areas ("Lobby", "Storehouse", "On-Call Area")
-  keyed by class name (`DC_Stan_Hurston_S1_Farnesway_CargoShop`), no starmap link
-  (`StarmapObjectUUID` is null). Possibly useful for hauling contracts later.
+- `trade_locations.json`: hauling-mission endpoints (965) keyed by class name, with their own
+  UUIDs and no starmap link (`StarmapObjectUUID` is null). Includes sub-areas ("Lobby",
+  "On-Call Area") and city venues: `LandingZone_Stanton_3_Spaceport` = "Riker Memorial
+  Spaceport" (`25321821-…`). Class names encode the place loosely (`LandingZone_Stanton_<n>`
+  = the landing zone on the body tagged `Stanton<n>`, `DC_Stan_Covalex_S1_S1DC06_*`).
+- `contracts/*.json` (5 153 files): mission definitions. Hauling contracts list pickup/dropoff
+  pools as **trade_locations UUIDs** (e.g. Riker `25321821-…`, a separate `Area18` entry
+  `23f264b8-…`), not starmap UUIDs. Mapping trade locations → starmap nodes (via display
+  names + the aliases above, or class-name rules) is the way to read hauling contracts later.
 - `resources/commodities.json`: 206 commodities (keys, names, SCU box sizes, density) — will be
   needed by the cargo tool.
 - `resources/commodity_trade_locations.json`: commodity → trade locations by tag matching
   (mission-oriented, not terminal prices).
-- `labels.json`: localisation keys → English, for OCR aliasing if needed.
 
 ### Quirks to remember
 

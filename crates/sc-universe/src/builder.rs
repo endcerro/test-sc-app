@@ -1,10 +1,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
-use crate::lookup::NameIndex;
+use crate::lookup::{NameIndex, normalize};
 use crate::{
-    Amenity, DataMeta, GameUuid, JumpLink, Location, LocationId, LocationKind, Position, Universe,
-    Vec3,
+    Alias, Amenity, DataMeta, GameUuid, JumpLink, Location, LocationId, LocationKind, Position,
+    Universe, Vec3,
 };
 
 /// A location as handed over by a data source, before the tree is resolved.
@@ -73,6 +73,8 @@ pub enum BuildWarning {
     NoSystem { uuid: GameUuid, name: String },
     /// A jump link references an unknown node and was dropped.
     JumpEndpointMissing { uuid: GameUuid },
+    /// An alias targets an unknown (or dropped) node and was ignored.
+    AliasTargetMissing { uuid: GameUuid, alias: String },
 }
 
 impl fmt::Display for BuildWarning {
@@ -85,6 +87,9 @@ impl fmt::Display for BuildWarning {
             Self::Cycle { uuid, name } => write!(f, "{name} ({uuid}) is in a parent cycle"),
             Self::NoSystem { uuid, name } => write!(f, "{name} ({uuid}) has no system, dropped"),
             Self::JumpEndpointMissing { uuid } => write!(f, "jump endpoint {uuid} unknown"),
+            Self::AliasTargetMissing { uuid, alias } => {
+                write!(f, "alias {alias:?} targets unknown location {uuid}")
+            }
         }
     }
 }
@@ -95,6 +100,7 @@ impl fmt::Display for BuildWarning {
 /// - resolves parents, cutting cycles and re-attaching dangling nodes,
 /// - inherits missing positions from the closest positioned ancestor,
 /// - sorts children by kind then name for a stable order,
+/// - attaches aliases, dropping ones equal to the name or to an earlier alias,
 /// - builds the uuid and name indices.
 #[derive(Debug, Default)]
 pub struct UniverseBuilder {
@@ -102,6 +108,7 @@ pub struct UniverseBuilder {
     nodes: Vec<NodeSpec>,
     seen: HashMap<GameUuid, usize>,
     jumps: Vec<JumpSpec>,
+    aliases: Vec<(GameUuid, Alias)>,
     warnings: Vec<BuildWarning>,
 }
 
@@ -140,6 +147,13 @@ impl UniverseBuilder {
 
     pub fn add_jump(&mut self, jump: JumpSpec) -> &mut Self {
         self.jumps.push(jump);
+        self
+    }
+
+    /// Adds another name for the node `target`. Aliases are attached in insertion order;
+    /// one whose normalised form equals the node's name or an earlier alias is dropped.
+    pub fn add_alias(&mut self, target: GameUuid, alias: Alias) -> &mut Self {
+        self.aliases.push((target, alias));
         self
     }
 
@@ -246,6 +260,7 @@ impl UniverseBuilder {
                 hierarchy_tag: None,
                 jurisdiction: None,
                 amenities: Vec::new(),
+                aliases: Vec::new(),
             });
         }
         let mut node_id: Vec<Option<LocationId>> = vec![None; n];
@@ -274,6 +289,7 @@ impl UniverseBuilder {
                 hierarchy_tag: spec.hierarchy_tag,
                 jurisdiction: spec.jurisdiction,
                 amenities: spec.amenities,
+                aliases: Vec::new(),
             });
         }
 
@@ -318,14 +334,38 @@ impl UniverseBuilder {
             queue.extend(locations[idx].children.iter().copied());
         }
 
-        // 7. Indices.
+        // 7. Aliases.
+        for (target, alias) in std::mem::take(&mut self.aliases) {
+            let Some(id) = self.seen.get(&target).and_then(|&i| node_id[i]) else {
+                self.warnings.push(BuildWarning::AliasTargetMissing {
+                    uuid: target,
+                    alias: alias.name,
+                });
+                continue;
+            };
+            let loc = &mut locations[id.index()];
+            let key = normalize(&alias.name);
+            let duplicate = key.is_empty()
+                || key == normalize(&loc.name)
+                || loc.aliases.iter().any(|a| normalize(&a.name) == key)
+                || loc.aliases.len() >= usize::from(u16::MAX);
+            if !duplicate {
+                loc.aliases.push(alias);
+            }
+        }
+
+        // 8. Indices.
         let mut by_uuid = HashMap::with_capacity(locations.len());
         let mut names = NameIndex::default();
         for loc in &locations {
             if let Some(u) = loc.uuid {
                 by_uuid.insert(u, loc.id);
             }
-            names.insert(&loc.name, loc.id);
+            names.insert(&loc.name, loc.id, None);
+            for (i, a) in loc.aliases.iter().enumerate() {
+                let i = u16::try_from(i).unwrap_or(u16::MAX);
+                names.insert(&a.name, loc.id, Some(i));
+            }
         }
 
         let mut jump_links = Vec::new();

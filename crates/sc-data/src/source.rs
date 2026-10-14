@@ -26,4 +26,7 @@ pub struct LoadOptions {
     /// Keep objects that are hidden on the starmap, have no coordinates and no amenities
     /// (hundreds of mission spawn templates such as "QV Logistics Station").
     pub include_hidden_unpositioned: bool,
+    /// Don't derive venue aliases from `labels.json` (and don't download it). Curated
+    /// aliases are always applied.
+    pub skip_label_aliases: bool,
 }

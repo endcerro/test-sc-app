@@ -24,6 +24,6 @@ pub use builder::{BuildWarning, JumpSpec, NodeSpec, UniverseBuilder};
 pub use geometry::{Distance, DistanceError, Leg, Route, Vec3};
 pub use id::{GameUuid, LocationId};
 pub use kind::LocationKind;
-pub use location::{Amenity, Location, Position};
+pub use location::{Alias, AliasKind, Amenity, Location, Position};
 pub use lookup::{LookupOptions, Match, normalize};
 pub use universe::{DataMeta, JumpLink, Universe};

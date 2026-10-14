@@ -2,6 +2,7 @@
 //! extracted per patch by the Star Citizen Wiki. Source of truth for the location tree and
 //! coordinates. See `docs/data-sources.md`.
 
+mod aliases;
 mod convert;
 pub mod dto;
 pub mod fetch;
@@ -13,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sc_universe::DataMeta;
 
-use self::dto::{PositionsFile, StarmapObject};
+use self::dto::{MissionLocations, PositionsFile, StarmapObject};
 use crate::http::{HttpClient, UreqClient};
 use crate::{Cache, CacheEntry, DataError, LoadOptions, LoadedUniverse, UniverseSource};
 
@@ -25,6 +26,11 @@ const STARMAP: &str = "starmap.json";
 const POSITIONS: &str = "starmap_positions.json";
 /// Files needed to build the universe.
 pub const FILES: [&str; 2] = [STARMAP, POSITIONS];
+/// Game localization (11 MB). Only its `mission_location_*` strings are used, for venue
+/// aliases; optional.
+pub const LABELS: &str = "labels.json";
+/// What the cache keeps of [`LABELS`]: just the `mission_location_*` entries.
+pub const MISSION_LOCATIONS: &str = "mission_locations.json";
 
 /// Where and what to fetch.
 #[derive(Debug, Clone)]
@@ -74,8 +80,9 @@ impl std::fmt::Debug for ScunpackedSource {
 }
 
 impl ScunpackedSource {
-    /// Reads `starmap.json` and `starmap_positions.json` from a local directory
-    /// (a checkout of the repo, or a cache revision directory).
+    /// Reads `starmap.json` and `starmap_positions.json` from a local directory (a
+    /// checkout of the repo, or a cache revision directory), plus `labels.json` or
+    /// `mission_locations.json` if present.
     pub fn from_dir(dir: impl Into<PathBuf>) -> Self {
         Self {
             mode: Mode::Dir(dir.into()),
@@ -135,6 +142,17 @@ impl ScunpackedSource {
                 notes.push(format!("downloaded revision {}", short(&rev.sha)));
                 Ok((rev.sha, version, Some(now)))
             });
+        // Labels are optional: a failure only costs the derived aliases.
+        if let Ok((sha, ..)) = &fresh
+            && !self.options.skip_label_aliases
+            && !cache.has_all(sha, &[MISSION_LOCATIONS])
+            && let Err(err) = self.fetch_mission_locations(&cache, &cfg.repo, sha)
+        {
+            tracing::warn!("labels download failed: {err}");
+            notes.push(format!(
+                "could not download {LABELS} ({err}); venue aliases limited to curated ones"
+            ));
+        }
 
         let (sha, version, fetched_at, from_cache) = match fresh {
             Ok((sha, version, fetched)) => (sha, version, fetched, false),
@@ -173,6 +191,28 @@ impl ScunpackedSource {
         loaded.notes.splice(0..0, notes);
         Ok(loaded)
     }
+
+    /// Downloads `labels.json` and caches only its mission location strings.
+    fn fetch_mission_locations(
+        &self,
+        cache: &Cache,
+        repo: &str,
+        sha: &str,
+    ) -> Result<(), DataError> {
+        let url = fetch::raw_url(repo, sha, LABELS);
+        tracing::info!("downloading {url}");
+        let bytes = self.http.get(&url, None)?;
+        let labels: MissionLocations =
+            serde_json::from_slice(&bytes).map_err(|source| DataError::Json {
+                what: url.clone(),
+                source,
+            })?;
+        let json = serde_json::to_vec_pretty(&labels).map_err(|source| DataError::Json {
+            what: MISSION_LOCATIONS.into(),
+            source,
+        })?;
+        cache.write_file(sha, MISSION_LOCATIONS, &json)
+    }
 }
 
 impl UniverseSource for ScunpackedSource {
@@ -193,24 +233,44 @@ impl UniverseSource for ScunpackedSource {
 fn load_dir(dir: &Path, options: LoadOptions, meta: DataMeta) -> Result<LoadedUniverse, DataError> {
     let starmap: Vec<StarmapObject> = read_json(&dir.join(STARMAP))?;
     let positions: PositionsFile = read_json(&dir.join(POSITIONS))?;
-    Ok(build(&starmap, &positions, options, meta))
+    let mut notes = Vec::new();
+    let labels: Option<MissionLocations> = if options.skip_label_aliases {
+        None
+    } else if let Some(path) = [MISSION_LOCATIONS, LABELS]
+        .into_iter()
+        .map(|f| dir.join(f))
+        .find(|p| p.is_file())
+    {
+        Some(read_json(&path)?)
+    } else {
+        notes.push(format!(
+            "no {LABELS} in {}; venue aliases limited to curated ones",
+            dir.display()
+        ));
+        None
+    };
+    let mut loaded = build(&starmap, &positions, labels.as_ref(), options, meta);
+    loaded.notes.splice(0..0, notes);
+    Ok(loaded)
 }
 
-/// Builds a universe from already parsed files.
+/// Builds a universe from already parsed files. `labels` feeds venue aliases.
 pub fn build(
     starmap: &[StarmapObject],
     positions: &PositionsFile,
+    labels: Option<&MissionLocations>,
     options: LoadOptions,
     meta: DataMeta,
 ) -> LoadedUniverse {
-    let (universe, warnings) = convert::build(starmap, positions, options).build(meta);
+    let (builder, notes) = convert::build(starmap, positions, labels, options);
+    let (universe, warnings) = builder.build(meta);
     for w in &warnings {
         tracing::debug!("universe data: {w}");
     }
     LoadedUniverse {
         universe,
         warnings,
-        notes: Vec::new(),
+        notes,
     }
 }
 

@@ -2,8 +2,8 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::lookup::NameIndex;
 use crate::{
-    Distance, DistanceError, GameUuid, Leg, Location, LocationId, LocationKind, LookupOptions,
-    Match, Route,
+    Alias, Distance, DistanceError, GameUuid, Leg, Location, LocationId, LocationKind,
+    LookupOptions, Match, Route,
 };
 
 /// Provenance of the loaded data.
@@ -154,12 +154,28 @@ impl Universe {
 
     // ---- lookup -------------------------------------------------------------------------
 
-    /// Locations whose normalised name equals the normalised `name`.
-    pub fn find_exact(&self, name: &str) -> &[LocationId] {
+    /// Locations whose normalised name or alias equals the normalised `name` (spaces
+    /// ignored if nothing matches with them). Own-name matches first, one per location.
+    pub fn find_exact(&self, name: &str) -> Vec<Match> {
         self.names.exact(name)
     }
 
-    /// Ranked fuzzy matches, best first. See [`crate::normalize`] for the rules.
+    /// The name a match was found under: the location's own name or the matched alias.
+    pub fn matched_name(&self, m: &Match) -> &str {
+        let loc = self.get(m.id);
+        m.alias
+            .and_then(|i| loc.aliases.get(usize::from(i)))
+            .map_or(loc.name.as_str(), |a| a.name.as_str())
+    }
+
+    /// The alias a match came through, if any.
+    pub fn matched_alias(&self, m: &Match) -> Option<&Alias> {
+        m.alias
+            .and_then(|i| self.get(m.id).aliases.get(usize::from(i)))
+    }
+
+    /// Ranked fuzzy matches over names and aliases, best first, one per location.
+    /// See [`crate::normalize`] for the rules.
     pub fn find_fuzzy(&self, query: &str, opts: LookupOptions) -> Vec<Match> {
         self.names.fuzzy(query, opts, |id| match opts.scope {
             Some(scope) => self.is_within(id, scope),

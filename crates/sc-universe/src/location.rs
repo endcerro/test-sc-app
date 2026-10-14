@@ -36,6 +36,44 @@ pub struct Amenity {
     pub display: String,
 }
 
+/// Why an [`Alias`] points at a location.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AliasKind {
+    /// Another spelling or name of the location itself (`Area 18` for `Area18`).
+    AltName,
+    /// A named place inside the location, reached through it (`Riker Memorial Spaceport`
+    /// in `Area18`). For travel purposes it is the same place.
+    Venue,
+}
+
+impl AliasKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::AltName => "alt name",
+            Self::Venue => "venue",
+        }
+    }
+}
+
+/// Another name that resolves to a location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Alias {
+    pub name: String,
+    pub kind: AliasKind,
+    /// Where the alias comes from (`"labels"`, `"curated"`...), for diagnostics.
+    pub source: String,
+}
+
+impl Alias {
+    pub fn new(name: impl Into<String>, kind: AliasKind, source: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            kind,
+            source: source.into(),
+        }
+    }
+}
+
 /// One node of the universe tree.
 #[derive(Debug, Clone)]
 pub struct Location {
@@ -62,6 +100,8 @@ pub struct Location {
     pub hierarchy_tag: Option<String>,
     pub jurisdiction: Option<String>,
     pub amenities: Vec<Amenity>,
+    /// Other names resolving to this location (see [`Alias`]).
+    pub aliases: Vec<Alias>,
 }
 
 impl Location {

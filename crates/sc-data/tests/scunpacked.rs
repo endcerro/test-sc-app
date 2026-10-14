@@ -9,7 +9,7 @@ use sc_data::http::HttpClient;
 use sc_data::{
     DataError, LoadOptions, LoadedUniverse, RemoteConfig, ScunpackedSource, UniverseSource,
 };
-use sc_universe::{LocationId, LocationKind, Position, Universe};
+use sc_universe::{AliasKind, LocationId, LocationKind, LookupOptions, Position, Universe};
 
 const SHA: &str = "5ee0a3dd20ba0e8dfd13512c57a2309231c8b8f7";
 const REPO: &str = "StarCitizenWiki/scunpacked-data";
@@ -26,8 +26,8 @@ fn load(options: LoadOptions) -> LoadedUniverse {
 }
 
 fn one(u: &Universe, name: &str) -> LocationId {
-    match u.find_exact(name) {
-        [id] => *id,
+    match u.find_exact(name).as_slice() {
+        [m] => m.id,
         other => panic!("expected one {name:?}, found {}", other.len()),
     }
 }
@@ -77,6 +77,7 @@ fn filters_noise_by_default() {
     let all = load(LoadOptions {
         include_asteroid_scatter: true,
         include_hidden_unpositioned: true,
+        ..LoadOptions::default()
     })
     .universe;
     assert!(!all.find_exact("QV Logistics Station").is_empty());
@@ -148,6 +149,76 @@ fn lookup_on_real_names() {
     assert_eq!(best.map(|l| l.name.as_str()), Some("Everus Harbor"));
 }
 
+#[test]
+fn venue_aliases_resolve_to_their_location() {
+    let loaded = load(LoadOptions::default());
+    let u = &loaded.universe;
+    let area18 = one(u, "Area18");
+    let lorville = one(u, "Lorville");
+
+    // From labels.json ("... in Area18") and/or the curated file: same location either way.
+    let m = u.find_exact("riker memorial spaceport");
+    assert_eq!(m.len(), 1);
+    assert_eq!(m[0].id, area18);
+    assert_eq!(u.matched_name(&m[0]), "Riker Memorial Spaceport");
+    assert_eq!(
+        u.matched_alias(&m[0]).map(|a| a.kind),
+        Some(AliasKind::Venue)
+    );
+    assert_eq!(one(u, "Adira Falls Apartments"), area18);
+    assert_eq!(one(u, "L19 Admin Office"), lorville);
+    assert_eq!(one(u, "Area 18"), area18);
+
+    let d = u
+        .distance(one(u, "Riker Memorial Spaceport"), area18)
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(d.metres(), 0.0);
+    let d = u
+        .distance(
+            one(u, "Teasa Spaceport"),
+            one(u, "Riker Memorial Spaceport"),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!((22.0..24.0).contains(&d.gm()), "Teasa-Riker {d}");
+
+    let best = u.resolve("RIKER MEM0RIAL SPACEPRT", LookupOptions::default());
+    assert_eq!(best.map(|l| l.id), Some(area18));
+
+    // Noise is not imported: "on <planet>", articles, venue names that are locations.
+    for l in u.locations() {
+        for a in &l.aliases {
+            assert!(
+                [
+                    "Riker Memorial Spaceport",
+                    "Adira Falls Apartments",
+                    "Teasa Spaceport",
+                    "L19 Admin Office",
+                    "Area 18"
+                ]
+                .contains(&a.name.as_str()),
+                "unexpected alias {:?} on {}",
+                a.name,
+                l.name
+            );
+        }
+    }
+    // Curated targets absent from the fixture (New Babbage...) are skipped silently.
+    assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+    assert!(loaded.notes.is_empty(), "{:?}", loaded.notes);
+}
+
+#[test]
+fn label_aliases_can_be_disabled() {
+    let u = load(LoadOptions {
+        skip_label_aliases: true,
+        ..LoadOptions::default()
+    })
+    .universe;
+    assert!(u.find_exact("Adira Falls Apartments").is_empty());
+    // Curated aliases stay.
+    assert_eq!(one(&u, "Riker Memorial Spaceport"), one(&u, "Area18"));
+}
+
 // ---- remote flow with a fake HTTP client ---------------------------------------------------
 
 #[derive(Default)]
@@ -164,7 +235,10 @@ impl FakeHttp {
             format!(r#"{{"sha":"{SHA}","commit":{{"message":"4.10.2-LIVE.12881860"}}}}"#)
                 .into_bytes(),
         );
-        for f in sc_data::scunpacked::FILES {
+        let files = sc_data::scunpacked::FILES
+            .into_iter()
+            .chain([sc_data::scunpacked::LABELS]);
+        for f in files {
             let bytes = std::fs::read(fixture_dir().join(f)).unwrap_or_else(|e| panic!("{e}"));
             routes.insert(sc_data::scunpacked::fetch::raw_url(REPO, SHA, f), bytes);
         }
@@ -211,7 +285,7 @@ fn remote(cache: &std::path::Path, http: Arc<FakeHttp>) -> ScunpackedSource {
 fn remote_download_then_cache_hit_then_offline_fallback() {
     let tmp = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
 
-    // 1. Cold cache: downloads both files.
+    // 1. Cold cache: downloads the two universe files and the labels.
     let http = Arc::new(FakeHttp::online());
     let loaded = remote(tmp.path(), http.clone())
         .load()
@@ -220,8 +294,22 @@ fn remote_download_then_cache_hit_then_offline_fallback() {
     assert_eq!(meta.game_version.as_deref(), Some("4.10.2-LIVE.12881860"));
     assert_eq!(meta.revision.as_deref(), Some(SHA));
     assert!(!meta.from_cache);
-    assert_eq!(http.calls().len(), 3, "{:?}", http.calls());
+    assert_eq!(http.calls().len(), 4, "{:?}", http.calls());
     assert!(!loaded.universe.find_exact("Lorville").is_empty());
+    // Only the mission location strings of labels.json are cached.
+    let cached = tmp.path().join(SHA);
+    assert!(
+        cached
+            .join(sc_data::scunpacked::MISSION_LOCATIONS)
+            .is_file()
+    );
+    assert!(!cached.join(sc_data::scunpacked::LABELS).exists());
+    assert!(
+        !loaded
+            .universe
+            .find_exact("Adira Falls Apartments")
+            .is_empty()
+    );
 
     // 2. Same revision: only the ref lookup, no download.
     let http = Arc::new(FakeHttp::online());
@@ -240,6 +328,46 @@ fn remote_download_then_cache_hit_then_offline_fallback() {
     assert!(meta.from_cache);
     assert_eq!(meta.game_version.as_deref(), Some("4.10.2-LIVE.12881860"));
     assert!(loaded.notes.iter().any(|n| n.contains("cached")));
+}
+
+#[test]
+fn labels_are_optional() {
+    let tmp = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
+
+    // Labels download fails: the universe still loads, with curated aliases only.
+    let mut http = FakeHttp::online();
+    http.routes.retain(|url, _| !url.ends_with("/labels.json"));
+    let loaded = remote(tmp.path(), Arc::new(http))
+        .load()
+        .unwrap_or_else(|e| panic!("{e}"));
+    let u = &loaded.universe;
+    assert!(u.find_exact("Adira Falls Apartments").is_empty());
+    assert!(!u.find_exact("Riker Memorial Spaceport").is_empty());
+    assert!(
+        loaded.notes.iter().any(|n| n.contains("labels.json")),
+        "{:?}",
+        loaded.notes
+    );
+
+    // Offline with that cache (no mission_locations.json): still loads.
+    let loaded = remote(tmp.path(), Arc::new(FakeHttp::offline()))
+        .load()
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(loaded.universe.meta().from_cache);
+
+    // Back online: only the missing labels are fetched.
+    let http = Arc::new(FakeHttp::online());
+    let loaded = remote(tmp.path(), http.clone())
+        .load()
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(http.calls().len(), 2, "{:?}", http.calls());
+    assert!(http.calls()[1].ends_with("/labels.json"));
+    assert!(
+        !loaded
+            .universe
+            .find_exact("Adira Falls Apartments")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -309,4 +437,23 @@ fn live_master_invariants() {
     ] {
         assert!(!u.find_exact(name).is_empty(), "missing {name}");
     }
+    for (venue, city) in [
+        ("Riker Memorial Spaceport", "Area18"),
+        ("Teasa Spaceport", "Lorville"),
+        ("August Dunlow Spaceport", "Orison"),
+        ("NB Int. Spaceport", "New Babbage"),
+        ("Area 18", "Area18"),
+    ] {
+        let m = u.find_exact(venue);
+        assert_eq!(
+            m.first().map(|m| u.get(m.id).name.as_str()),
+            Some(city),
+            "{venue}"
+        );
+    }
+    assert!(
+        loaded.notes.iter().all(|n| !n.contains("curated")),
+        "{:?}",
+        loaded.notes
+    );
 }

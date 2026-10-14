@@ -1,0 +1,29 @@
+{
+  "_doc": "Hand-maintained aliases, embedded in sc-data at build time. 'target' is the starmap.json UUID (stable across patches); 'target_name' is only a sanity check, a mismatch is reported as a load note. 'alt_names' are other names of the location itself, 'venues' are named places inside it (spaceports, admin offices...). Names already derived from labels.json can stay here as a safety net. See docs/data-sources.md.",
+  "entries": [
+    {
+      "target": "c6535844-c615-494e-9dc1-c2d0c6e7190a",
+      "target_name": "Area18",
+      "alt_names": ["Area 18"],
+      "venues": ["Riker Memorial Spaceport"]
+    },
+    {
+      "target": "f1759f46-e3c0-4dc1-94bc-c94488b58913",
+      "target_name": "Lorville",
+      "alt_names": [],
+      "venues": ["Teasa Spaceport"]
+    },
+    {
+      "target": "567f92d7-d34c-42fa-b57b-f1939d4c5f5b",
+      "target_name": "Orison",
+      "alt_names": [],
+      "venues": ["August Dunlow Spaceport"]
+    },
+    {
+      "target": "122e8057-831d-4517-a23b-0eb8382b90a2",
+      "target_name": "New Babbage",
+      "alt_names": [],
+      "venues": ["NB Int. Spaceport", "New Babbage Interstellar Spaceport"]
+    }
+  ]
+}

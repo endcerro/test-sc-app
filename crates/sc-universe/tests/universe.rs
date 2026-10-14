@@ -1,8 +1,8 @@
 //! Behaviour tests on a small hand-built universe.
 
 use sc_universe::{
-    Amenity, BuildWarning, DataMeta, DistanceError, GameUuid, JumpSpec, Leg, LocationKind,
-    LookupOptions, NodeSpec, Universe, UniverseBuilder, Vec3,
+    Alias, AliasKind, Amenity, BuildWarning, DataMeta, DistanceError, GameUuid, JumpSpec, Leg,
+    LocationKind, LookupOptions, NodeSpec, Universe, UniverseBuilder, Vec3,
 };
 
 fn uuid(n: u128) -> GameUuid {
@@ -125,7 +125,7 @@ fn sample() -> (Universe, Vec<BuildWarning>) {
 fn id_of(u: &Universe, name: &str) -> sc_universe::LocationId {
     let ids = u.find_exact(name);
     assert_eq!(ids.len(), 1, "expected exactly one {name}");
-    ids[0]
+    ids[0].id
 }
 
 #[test]
@@ -288,4 +288,84 @@ fn warnings_for_bad_data() {
     // System was auto-declared with a capitalised name.
     assert!(u.system("Test").is_some());
     assert!(u.jump_links().is_empty());
+}
+
+#[test]
+fn aliases_resolve_to_their_target() {
+    let mut b = UniverseBuilder::new();
+    let mut star = node(1, None, "Stanton", LocationKind::Star, Some(Vec3::ZERO));
+    star.system = Some("stanton".into());
+    b.add_node(star);
+    b.add_node(node(
+        2,
+        Some(1),
+        "ArcCorp",
+        LocationKind::Planet,
+        Some(Vec3::new(18.5e9, 0.0, 0.0)),
+    ));
+    b.add_node(node(
+        3,
+        Some(2),
+        "Area18",
+        LocationKind::City,
+        Some(Vec3::new(18.5e9 + 0.8e6, 0.0, 0.0)),
+    ));
+    // A location whose own name equals another location's alias.
+    b.add_node(node(
+        4,
+        Some(1),
+        "Teasa Spaceport",
+        LocationKind::Station,
+        Some(Vec3::new(1.0e9, 0.0, 0.0)),
+    ));
+    let venue = |n: &str| Alias::new(n, AliasKind::Venue, "test");
+    b.add_alias(uuid(3), venue("Riker Memorial Spaceport"))
+        .add_alias(uuid(3), venue("riker memorial  spaceport")) // duplicate once normalised
+        .add_alias(uuid(3), Alias::new("AREA18", AliasKind::AltName, "test")) // = own name
+        .add_alias(uuid(3), venue("Teasa Spaceport"))
+        .add_alias(uuid(999), venue("Nowhere"));
+    let (u, w) = b.build(DataMeta::default());
+
+    assert_eq!(
+        w,
+        [BuildWarning::AliasTargetMissing {
+            uuid: uuid(999),
+            alias: "Nowhere".into()
+        }]
+    );
+    let area18 = id_of(&u, "Area18");
+    let names: Vec<&str> = u
+        .get(area18)
+        .aliases
+        .iter()
+        .map(|a| a.name.as_str())
+        .collect();
+    assert_eq!(names, ["Riker Memorial Spaceport", "Teasa Spaceport"]);
+
+    let m = u.find_exact("RIKER MEMORIAL SPACEPORT");
+    assert_eq!(m.len(), 1);
+    assert_eq!(m[0].id, area18);
+    assert_eq!(u.matched_name(&m[0]), "Riker Memorial Spaceport");
+    assert_eq!(
+        u.matched_alias(&m[0]).map(|a| a.kind),
+        Some(AliasKind::Venue)
+    );
+    let d = u
+        .distance(m[0].id, area18)
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(d.metres(), 0.0);
+
+    // OCR noise on an alias still lands on the target.
+    let best = u.resolve("Riker Memorial Spaceprt", LookupOptions::default());
+    assert_eq!(best.map(|l| l.id), Some(area18));
+
+    // Own name wins over an alias on a tie.
+    let m = u.find_exact("Teasa Spaceport");
+    assert_eq!(m.len(), 2);
+    assert_eq!(u.get(m[0].id).name, "Teasa Spaceport");
+    assert_eq!(m[0].alias, None);
+    assert_eq!(m[1].id, area18);
+
+    // Space-insensitive fallback.
+    assert_eq!(u.find_exact("Area 18").first().map(|m| m.id), Some(area18));
 }

@@ -32,7 +32,14 @@ System (synthetic, one per system code)
 
 `Location` keeps: `uuid` (`GameUuid`, stable), `name`, `kind` (`LocationKind`), `raw_type`
 (source type string), `parent`/`children`, `system`, `position`, `radius_m`, `qt_valid`,
-`hidden`, `hierarchy_tag`, `jurisdiction`, `amenities`.
+`hidden`, `hierarchy_tag`, `jurisdiction`, `amenities`, `aliases`.
+
+`Alias { name, kind, source }` is another name that resolves to the location itself:
+`AliasKind::AltName` (`Area 18`) or `AliasKind::Venue`, a named place inside it
+(`Riker Memorial Spaceport` in `Area18`). Venues are deliberately **not** separate nodes:
+for travel they are the same place, so lookups return the location's own id and distances
+are 0 without special cases. If hauling ever needs sub-area granularity, venues can become
+child nodes fed by the same data.
 
 `Position`:
 - `Exact(Vec3)`: from the source.
@@ -52,7 +59,9 @@ System (synthetic, one per system code)
 3. assign each node the system code of its root (`NoSystem` → dropped),
 4. create system roots, attach roots below them, sort children (kind, name),
 5. propagate positions top-down,
-6. build indices and jump links.
+6. attach aliases (`add_alias(target_uuid, Alias)`; unknown target → `AliasTargetMissing`,
+   duplicates of the name or an earlier alias dropped),
+7. build indices and jump links.
 
 Warnings never fail the build; they're returned next to the `Universe`.
 
@@ -67,10 +76,19 @@ Warnings never fail the build; they're returned next to the `Universe`.
 ### Name lookup (for OCR)
 
 `normalize()` folds Unicode, case, punctuation, apostrophes, `&`, and `centre/center`.
-`find_exact` returns every id for a name (duplicates are common). `find_fuzzy` scores with
-max(Jaro-Winkler, normalised Levenshtein) and can be scoped to a subtree to tell apart
-duplicates ("RSI Event Platform" on Hurston vs microTech). Future: an alias table
-(old names, abbreviations like `ARC-L1`, terminal names).
+The name index holds own names **and aliases**; a `Match { id, score, alias }` says which
+(`Universe::matched_name` / `matched_alias`). Rules:
+
+- `find_exact` returns every location for a name (duplicates are common), one match per
+  location, own-name matches first. If nothing matches, it retries ignoring spaces
+  (`Area 18` = `Area18`, `GrimHEX` = `Grim HEX`).
+- `find_fuzzy` scores with max(Jaro-Winkler, normalised Levenshtein) (1.0 when equal
+  ignoring spaces), keeps the best name per location, ranks own names before aliases on
+  ties, and can be scoped to a subtree to tell apart duplicates ("RSI Event Platform" on
+  Hurston vs microTech).
+
+Alias sources: `labels.json` venue strings and the curated `crates/sc-data/data/aliases.json`
+(see `data-sources.md`); UEX terminal names will be the next one.
 
 ## Loading pipeline (scunpacked)
 
@@ -80,6 +98,8 @@ resolve ref ──► sha (+version)        GitHub API, fallback git smart HTTP 
     ├─ cache/<sha>/ complete? ──yes──► load from disk
     │        no
     ├─ download starmap.json + starmap_positions.json @ sha  ──► atomic write ──► manifest
+    ├─ mission_locations.json missing? ──► download labels.json, keep mission_location_*
+    │                                       (failure = note only, curated aliases still apply)
     │
     └─ any failure ──► cache manifest "latest" ──► load (from_cache = true) ──► else Unavailable
 ```
@@ -90,11 +110,13 @@ kept. Default dir: `directories::ProjectDirs::from("", "", "sc-companion").cache
 Conversion (`scunpacked/convert.rs`): starmap.json is the base (names, types, amenities,
 parents); positions add coordinates and system codes; placeholders and UI types are dropped;
 asteroid scatter and hidden unpositioned templates are dropped unless `LoadOptions` asks;
-children of dropped nodes are re-attached to the nearest kept ancestor.
+children of dropped nodes are re-attached to the nearest kept ancestor; aliases (curated, then
+labels-derived) are resolved against the kept nodes (`scunpacked/aliases.rs`).
 
 ## Next steps
 
 - `sc-data::uex`: terminals + prices, joined onto the universe (see `data-sources.md`).
-- Alias table for OCR names; terminal-level locations.
+- More aliases: UEX terminal names, common abbreviations; map `trade_locations` UUIDs (hauling
+  contracts) onto locations.
 - eframe app shell with async startup load and a universe browser.
 - OCR crate and the cargo route optimizer on top of `Universe::route`.

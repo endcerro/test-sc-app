@@ -9,7 +9,7 @@ use std::time::Instant;
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use sc_data::{LoadOptions, RemoteConfig, ScunpackedSource, UniverseSource};
-use sc_universe::{Leg, Location, LocationId, LocationKind, LookupOptions, Universe};
+use sc_universe::{Leg, Location, LocationId, LocationKind, LookupOptions, Match, Universe};
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Star Citizen companion - universe data inspector")]
@@ -29,6 +29,9 @@ struct Cli {
     /// Keep hidden objects that have neither coordinates nor amenities (mission templates).
     #[arg(long, global = true)]
     keep_hidden_unpositioned: bool,
+    /// Don't derive venue aliases from the game's labels.json (curated aliases stay).
+    #[arg(long, global = true)]
+    no_label_aliases: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -46,6 +49,9 @@ enum Command {
         /// Hide locations hidden on the in-game starmap.
         #[arg(long)]
         visible_only: bool,
+        /// List aliases (alternative names, venues) under each location.
+        #[arg(long)]
+        aliases: bool,
     },
     /// Fuzzy search a location by name.
     Find {
@@ -78,6 +84,7 @@ fn main() -> Result<()> {
     let options = LoadOptions {
         include_asteroid_scatter: cli.asteroids,
         include_hidden_unpositioned: cli.keep_hidden_unpositioned,
+        skip_label_aliases: cli.no_label_aliases,
     };
     let source = match &cli.data_dir {
         Some(dir) => ScunpackedSource::from_dir(dir),
@@ -112,13 +119,14 @@ fn main() -> Result<()> {
             root,
             depth,
             visible_only,
+            aliases,
         } => {
             let roots: Vec<LocationId> = match root {
                 Some(name) => vec![resolve(u, &name, None)?],
                 None => u.systems().map(|s| s.id).collect(),
             };
             for r in roots {
-                print_tree(u, r, 0, depth, visible_only);
+                print_tree(u, r, 0, depth, visible_only, aliases);
             }
         }
         Command::Find { text, scope, limit } => {
@@ -136,8 +144,12 @@ fn main() -> Result<()> {
             }
             for m in matches {
                 let l = u.get(m.id);
+                let via = u
+                    .matched_alias(&m)
+                    .map(|a| format!("  (via {} {:?})", a.kind.label(), a.name))
+                    .unwrap_or_default();
                 println!(
-                    "{:.3}  {:<14} {}",
+                    "{:.3}  {:<14} {}{via}",
                     m.score,
                     l.kind.label(),
                     u.path_string(m.id)
@@ -189,17 +201,26 @@ fn resolve(u: &Universe, name: &str, scope: Option<LocationId>) -> Result<Locati
     if let Some(sys) = u.system(name) {
         return Ok(sys.id);
     }
-    let exact: Vec<LocationId> = u
+    let exact: Vec<Match> = u
         .find_exact(name)
-        .iter()
-        .copied()
-        .filter(|id| scope.is_none_or(|s| u.is_within(*id, s)))
+        .into_iter()
+        .filter(|m| scope.is_none_or(|s| u.is_within(m.id, s)))
         .collect();
-    match exact.as_slice() {
-        [one] => return Ok(*one),
+    // An own-name match wins over locations that merely have it as an alias.
+    let own: Vec<&Match> = exact.iter().filter(|m| m.alias.is_none()).collect();
+    let candidates: Vec<&Match> = if own.is_empty() {
+        exact.iter().collect()
+    } else {
+        own
+    };
+    match candidates.as_slice() {
+        [one] => {
+            note_alias(u, one);
+            return Ok(one.id);
+        }
         [] => {}
         many => {
-            let list: Vec<String> = many.iter().map(|id| u.path_string(*id)).collect();
+            let list: Vec<String> = many.iter().map(|m| u.path_string(m.id)).collect();
             bail!("{name:?} is ambiguous:\n  {}", list.join("\n  "));
         }
     }
@@ -209,10 +230,22 @@ fn resolve(u: &Universe, name: &str, scope: Option<LocationId>) -> Result<Locati
     };
     match u.find_fuzzy(name, opts).first() {
         Some(m) => {
-            eprintln!("note: {name:?} -> {} ({:.2})", u.get(m.id).name, m.score);
+            eprintln!("note: {name:?} -> {} ({:.2})", u.matched_name(m), m.score);
+            note_alias(u, m);
             Ok(m.id)
         }
         None => bail!("no location matches {name:?}"),
+    }
+}
+
+fn note_alias(u: &Universe, m: &Match) {
+    if let Some(a) = u.matched_alias(m) {
+        eprintln!(
+            "note: {:?} is a {} of {}",
+            a.name,
+            a.kind.label(),
+            u.path_string(m.id)
+        );
     }
 }
 
@@ -229,16 +262,18 @@ fn summary(u: &Universe) {
     }
     for sys in u.systems() {
         let mut counts: std::collections::BTreeMap<LocationKind, usize> = Default::default();
-        let mut trading = 0;
+        let (mut trading, mut aliases) = (0, 0);
         for l in u.descendants(sys.id).skip(1) {
             *counts.entry(l.kind).or_default() += 1;
             trading += usize::from(l.has_commodity_trading());
+            aliases += l.aliases.len();
         }
         let parts: Vec<String> = counts.iter().map(|(k, n)| format!("{n} {k}")).collect();
         println!(
-            "\n{} — {} trading locations\n  {}",
+            "\n{} — {} trading locations, {} aliases\n  {}",
             sys.name,
             trading,
+            aliases,
             parts.join(", ")
         );
     }
@@ -248,7 +283,14 @@ fn summary(u: &Universe) {
     }
 }
 
-fn print_tree(u: &Universe, id: LocationId, indent: usize, max_depth: usize, visible_only: bool) {
+fn print_tree(
+    u: &Universe,
+    id: LocationId,
+    indent: usize,
+    max_depth: usize,
+    visible_only: bool,
+    aliases: bool,
+) {
     let l: &Location = u.get(id);
     if visible_only && l.hidden {
         return;
@@ -270,9 +312,20 @@ fn print_tree(u: &Universe, id: LocationId, indent: usize, max_depth: usize, vis
         l.kind.label(),
         flags
     );
+    if aliases {
+        for a in &l.aliases {
+            println!(
+                "{}= {} ({}, {})",
+                "  ".repeat(indent + 1),
+                a.name,
+                a.kind.label(),
+                a.source
+            );
+        }
+    }
     if indent < max_depth {
         for c in &l.children {
-            print_tree(u, *c, indent + 1, max_depth, visible_only);
+            print_tree(u, *c, indent + 1, max_depth, visible_only, aliases);
         }
     } else if !l.children.is_empty() {
         println!("{}… {} more", "  ".repeat(indent + 1), l.children.len());

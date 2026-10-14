@@ -10,6 +10,7 @@ and the egui GUI come next.
 cargo run -p sc-companion -- summary            # downloads data on first run, then cached
 cargo run -p sc-companion -- tree hurston --depth 1
 cargo run -p sc-companion -- find "everus harb0r"
+cargo run -p sc-companion -- find "riker memorial spaceport"   # venue alias -> Area18
 cargo run -p sc-companion -- dist Lorville "Ruin Station"
 cargo run -p sc-companion -- trading pyro
 ```

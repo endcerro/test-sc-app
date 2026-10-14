@@ -3,7 +3,11 @@
 //! Only the fields we use are declared; unknown fields are ignored and most fields default,
 //! so upstream additions or omissions don't break loading.
 
-use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::fmt;
+
+use serde::de::{IgnoredAny, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// One entry of `starmap.json`.
 #[derive(Debug, Clone, Deserialize)]
@@ -93,4 +97,45 @@ pub struct Connection {
     pub exit_uuid: String,
     #[serde(default)]
     pub fuel_cost: Option<f64>,
+}
+
+/// The `mission_location_*` entries of `labels.json` (the game's English localization),
+/// e.g. `"Riker Memorial Spaceport in Area18"`.
+///
+/// Deserializing skips every other key, so the 11 MB `labels.json` and the small
+/// `mission_locations.json` written to the cache parse into the same type.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct MissionLocations(pub BTreeMap<String, String>);
+
+impl MissionLocations {
+    pub const KEY_PREFIX: &'static str = "mission_location_";
+}
+
+impl<'de> Deserialize<'de> for MissionLocations {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visit;
+        impl<'de> Visitor<'de> for Visit {
+            type Value = MissionLocations;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a map of localization keys to strings")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                let mut out = BTreeMap::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    if key.starts_with(MissionLocations::KEY_PREFIX) {
+                        if let serde_json::Value::String(v) = map.next_value()? {
+                            out.insert(key, v);
+                        }
+                    } else {
+                        map.next_value::<IgnoredAny>()?;
+                    }
+                }
+                Ok(MissionLocations(out))
+            }
+        }
+        deserializer.deserialize_map(Visit)
+    }
 }
