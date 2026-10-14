@@ -2,6 +2,8 @@
 //! submitted, so the UI never blocks (the first read also downloads and loads the models).
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 
 use eframe::egui;
@@ -21,12 +23,26 @@ enum Event {
     Done(Outcome),
 }
 
+/// Queues screenshots from any thread (the capture hotkey's).
+#[derive(Debug, Clone)]
+pub struct Submitter {
+    jobs: Sender<PathBuf>,
+    /// Submitted and not finished yet.
+    pending: Arc<AtomicUsize>,
+}
+
+impl Submitter {
+    pub fn submit(&self, path: PathBuf) {
+        self.pending.fetch_add(1, Ordering::SeqCst);
+        // A send only fails if the thread died; `poll` then reports the pending reads.
+        let _ = self.jobs.send(path);
+    }
+}
+
 #[derive(Debug)]
 pub struct Worker {
-    jobs: Sender<PathBuf>,
+    submitter: Submitter,
     events: Receiver<Event>,
-    /// Submitted and not finished yet.
-    pending: usize,
     status: Option<String>,
 }
 
@@ -56,17 +72,22 @@ impl Worker {
             }
         });
         Self {
-            jobs,
+            submitter: Submitter {
+                jobs,
+                pending: Arc::new(AtomicUsize::new(0)),
+            },
             events,
-            pending: 0,
             status: None,
         }
     }
 
-    pub fn submit(&mut self, path: PathBuf) {
-        // A send only fails if the thread died; `poll` then reports the pending reads.
-        let _ = self.jobs.send(path);
-        self.pending += 1;
+    pub fn submit(&self, path: PathBuf) {
+        self.submitter.submit(path);
+    }
+
+    /// A handle to queue screenshots from another thread.
+    pub fn submitter(&self) -> Submitter {
+        self.submitter.clone()
     }
 
     /// Screenshots finished since the last call.
@@ -76,13 +97,17 @@ impl Worker {
             match self.events.try_recv() {
                 Ok(Event::Status(s)) => self.status = Some(s),
                 Ok(Event::Done(outcome)) => {
-                    self.pending = self.pending.saturating_sub(1);
+                    // Never below zero: a job is counted before it is sent.
+                    let _ = self.submitter.pending.fetch_update(
+                        Ordering::SeqCst,
+                        Ordering::SeqCst,
+                        |n| Some(n.saturating_sub(1)),
+                    );
                     done.push(outcome);
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
-                    if self.pending > 0 {
-                        self.pending = 0;
+                    if self.submitter.pending.swap(0, Ordering::SeqCst) > 0 {
                         done.push(Outcome::Failed {
                             path: PathBuf::new(),
                             error: "the OCR thread stopped unexpectedly".into(),
@@ -92,7 +117,7 @@ impl Worker {
                 }
             }
         }
-        if self.pending == 0 {
+        if self.pending() == 0 {
             self.status = None;
         }
         done
@@ -100,7 +125,7 @@ impl Worker {
 
     /// Screenshots waiting or being read.
     pub fn pending(&self) -> usize {
-        self.pending
+        self.submitter.pending.load(Ordering::SeqCst)
     }
 
     /// What the thread is doing now (while busy).

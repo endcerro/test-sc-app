@@ -16,6 +16,7 @@ use sc_contracts::{Contract, DropOff, Flow, Place, truth};
 use sc_universe::{Universe, normalize};
 use serde::{Deserialize, Serialize};
 
+use super::capture;
 use super::fields::{self, Field};
 use super::{Read, ReadKind, ShotText, parse};
 
@@ -350,8 +351,17 @@ impl ContractStore {
         Ok(())
     }
 
+    /// Removes an entry, with the screenshots the capture hotkey took for it (never files
+    /// the player dropped from elsewhere).
     pub fn remove(&mut self, id: u64) -> Result<()> {
         remove_if_exists(&self.path(id))?;
+        if let Some(e) = self.get(id) {
+            for shot in e.shots.iter().filter_map(|s| s.source.as_deref()) {
+                if capture::is_captured(&self.dir, shot) {
+                    remove_if_exists(shot)?;
+                }
+            }
+        }
         self.entries.retain(|e| e.id != id);
         Ok(())
     }
@@ -824,6 +834,33 @@ mod tests {
             .forget("ArcCorp's Yela facility")
             .unwrap_or_else(|e| panic!("{e}"));
         assert!(ContractStore::open(dir.path()).0.place_names().is_empty());
+    }
+
+    #[test]
+    fn removing_deletes_captured_shots_only() {
+        let dir = temp();
+        let (mut store, _) = ContractStore::open(dir.path());
+        let shots = capture::shots_dir(dir.path());
+        std::fs::create_dir_all(&shots).unwrap_or_else(|e| panic!("{e}"));
+        let captured = shots.join("1.png");
+        let dropped = dir.path().join("dropped.png");
+        for f in [&captured, &dropped] {
+            std::fs::write(f, "").unwrap_or_else(|e| panic!("{e}"));
+        }
+        let mut a = shot("09-redwind-yela-scroll-1");
+        a.source = Some(captured.clone());
+        let mut b = shot("09-redwind-yela-scroll-2");
+        b.source = Some(dropped.clone());
+        let id = store
+            .add_shot(a, &universe())
+            .unwrap_or_else(|e| panic!("{e}"))
+            .id();
+        store
+            .add_shot(b, &universe())
+            .unwrap_or_else(|e| panic!("{e}"));
+        store.remove(id).unwrap_or_else(|e| panic!("{e}"));
+        assert!(!captured.exists());
+        assert!(dropped.exists());
     }
 
     #[test]

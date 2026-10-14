@@ -1,12 +1,15 @@
 //! Hauling contracts read from screenshots: OCR ([`reader`]), parsing into flows
 //! ([`parse`]), the editable fields of a contract ([`fields`]), where each value was read
 //! ([`sources`]), place lookup ([`places`]), what to double-check ([`review`]), contract
-//! text import/export ([`board_text`]) and the saved list ([`store`]).
+//! text import/export ([`board_text`]), the saved list ([`store`]), in-game screen capture
+//! ([`capture`]) and board display prefs ([`prefs`]).
 //! Shared by the GUI's Contracts pane and the `contract` CLI command; no egui here.
 
 pub mod board_text;
+pub mod capture;
 pub mod fields;
 pub mod places;
+pub mod prefs;
 pub mod reader;
 pub mod review;
 pub mod sources;

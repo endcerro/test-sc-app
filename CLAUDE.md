@@ -14,7 +14,7 @@ Roadmap:
    Hauling Planner: which contracts to take and in what stop order, travel times from the
    universe distances); trading routes fed by OCR'd prices to come.
 4. **GUI** with egui/eframe (`apps/sc-companion`): pane shell, **Map** pane, **Contracts**
-   pane (drop hauling contract screenshots -> OCR -> saved list) and **Routes** pane (plans the
+   pane (drop hauling contract screenshots or press Ctrl+Shift+C in game -> OCR -> saved list) and **Routes** pane (plans the
    saved contracts) done; the Contracts view is a temporary UI (the reader/store under it
    stay); trading comes with its tool.
 
@@ -35,11 +35,11 @@ file schemas, quirks) before changing the data layer, and `docs/ocr.md` before c
 | `tools/ocr-bench` | OCR benchmark: grid over engines x pipelines x crop modes, result cache, CER + end-to-end scoring, `summary.md` reports. Engines are opt-in features. |
 | `samples/` | Contract screenshots, `truth/<stem>.txt` (`#HAULING v1`), `truth/regions/<stem>/<region>.txt` (exact region text). |
 | `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`, `contract`). OCR behind the `ocr` feature (off by default). |
-| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText`: text + line boxes, Paddle, models fetched on first use), `parse` (flows + snapping corrections), `fields` (`Field`: text/set of every editable value), `sources` (screenshot box a value was read from), `places` (place tree, suggestions, fixes, taught names), `review` (field marks, problems, next to check, duplicates), `board_text` (`#HAULING v1` import/export), `store` (`<id>.json` per contract + `place_names.json`; shots of the same contract merge; old `.txt` stores converted). |
+| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText`: text + line boxes, Paddle, models fetched on first use), `parse` (flows + snapping corrections), `fields` (`Field`: text/set of every editable value), `sources` (screenshot box a value was read from), `places` (place tree, suggestions, fixes, taught names), `review` (field marks, problems, next to check, duplicates), `board_text` (`#HAULING v1` import/export), `capture` (hotkey screen grab -> `shots/<ms>.png`, Windows via `xcap`), `prefs` (`board.json`: list order), `store` (`<id>.json` per contract + `place_names.json`; shots of the same contract merge; old `.txt` stores converted). |
 | `apps/sc-companion/src/routes.rs` | No egui: `RouteSetup` (ships + planning settings) saved as `planner.json` in the contracts dir. |
 | `apps/sc-companion/src/gui/routes` | Routes pane (ported from the hauling planner): setup bar (ship, start place, times, goal), planning thread, route cards (trip strip, cargo strip, stop table), "Not in the top route". |
 | `apps/sc-companion/src/gui/widgets.rs` | Widgets shared by the Contracts and Routes panes (buffered fields, place autocomplete, buttons, badge). |
-| `apps/sc-companion/src/gui/contracts` | Contracts pane (temporary view, ported from the hauling planner's board): drop box + paste/export box, background OCR `worker`, `card` per contract, source crops, Next to check (F8). |
+| `apps/sc-companion/src/gui/contracts` | Contracts pane (temporary view, ported from the hauling planner's board): drop box + paste/export box, background OCR `worker`, `hotkey` (Ctrl+Shift+C polled with `GetAsyncKeyState` via `device_query`, works while the game has focus), newest/oldest-first toggle (`#N` stays by age), `card` per contract, source crops, Next to check (F8). |
 | `apps/sc-companion/src/gui/theme.rs` | App theme (planner palette, Segoe UI + Segoe UI Symbol on Windows; `theme::sym` falls back to plain text without them). |
 | `apps/sc-companion/src/gui/map` | Map pane: `camera` (f64 orthographic 2D/3D projection), `scene` (pure what-to-draw + LOD, tested), `paint`, `style`, `inspector`. |
 

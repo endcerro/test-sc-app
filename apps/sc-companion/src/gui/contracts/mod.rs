@@ -1,10 +1,12 @@
 //! Contracts pane (a temporary view), ported from the hauling planner's contract board:
 //! drop contract screenshots (OCR'd in the background) or paste `#HAULING v1` text, then
 //! review each contract as a card, checking doubtful fields against the pixels they were
-//! read from. Board order is oldest first (`#1` at the top).
+//! read from. Contracts also arrive from the in-game capture hotkey ([`hotkey`]). `#N` is
+//! the Nth oldest contract; the board shows them newest or oldest first (a saved toggle).
 
 mod card;
 mod format;
+mod hotkey;
 mod worker;
 
 use std::collections::{HashMap, HashSet};
@@ -13,14 +15,17 @@ use std::sync::Arc;
 
 use crate::gui::widgets::{self, primary_button, small_button};
 use eframe::egui::{self, Color32, Key, Modifiers, RichText, Sense, Stroke, TextEdit, Ui};
+use hotkey::{Capture, Hotkey};
 use sc_contracts::{Contract, Flow};
 use sc_data::LoadedUniverse;
 use sc_universe::normalize;
 use worker::{Outcome, Worker};
 
 use crate::contracts::board_text::{self, Issue};
+use crate::contracts::capture;
 use crate::contracts::fields::{self, Field};
 use crate::contracts::places::{PlaceTree, Places};
+use crate::contracts::prefs::BoardPrefs;
 use crate::contracts::reader::{EXTENSIONS, NO_OCR, file_name, is_screenshot};
 use crate::contracts::review::{self, Lookup, Mark, Review};
 use crate::contracts::store::Added;
@@ -91,6 +96,9 @@ pub struct ContractsPane {
     store: ContractStore,
     /// `None` when this build has no OCR.
     worker: Option<Worker>,
+    /// The in-game capture hotkey (`None` without OCR or outside Windows).
+    hotkey: Option<Hotkey>,
+    prefs: BoardPrefs,
     /// Last capture result, with its colour.
     status: (String, Color32),
     error: Option<String>,
@@ -112,24 +120,38 @@ pub struct ContractsPane {
 
 impl ContractsPane {
     pub fn new(ctx: &egui::Context, data: Arc<LoadedUniverse>, dir: PathBuf) -> Self {
-        let (store, warnings) = ContractStore::open(dir);
+        let (prefs, prefs_warning) = BoardPrefs::load(&dir);
+        let (store, mut warnings) = ContractStore::open(dir);
+        warnings.extend(prefs_warning);
         let places = Places::new(&data.universe, store.place_names());
         let worker = ContractReader::available().then(|| Worker::start(ctx));
-        let status = if worker.is_some() {
-            (
-                "Ready: drop contract screenshots below".to_owned(),
+        let hotkey = worker
+            .as_ref()
+            .and_then(|w| Hotkey::start(ctx, capture::shots_dir(store.dir()), w.submitter()));
+        let status = match (&worker, &hotkey) {
+            (Some(_), Some(_)) => (
+                format!(
+                    "Ready: press {} in game on a contract, or drop screenshots below",
+                    hotkey::LABEL
+                ),
                 theme::MUTED,
-            )
-        } else {
-            (NO_OCR.to_owned(), theme::WARN)
+            ),
+            (Some(_), None) => (
+                "Ready: drop contract screenshots below (the capture hotkey needs Windows)"
+                    .to_owned(),
+                theme::MUTED,
+            ),
+            (None, _) => (NO_OCR.to_owned(), theme::WARN),
         };
         Self {
             data,
             store,
             worker,
+            hotkey,
+            prefs,
             status,
             error: (!warnings.is_empty())
-                .then(|| format!("Skipped saved contracts:\n{}", warnings.join("\n"))),
+                .then(|| format!("Skipped saved files:\n{}", warnings.join("\n"))),
             view: View::default(),
             places,
             trees: HashMap::new(),
@@ -142,9 +164,15 @@ impl ContractsPane {
         }
     }
 
+    /// Takes finished captures and reads; called every frame, whichever pane is shown, so
+    /// in-game captures land without opening this pane.
+    pub fn background(&mut self) {
+        self.poll_hotkey();
+        self.poll_worker();
+    }
+
     pub fn show(&mut self, ctx: &egui::Context) {
         self.take_dropped_files(ctx);
-        self.poll_worker();
         self.refresh_reviews();
         let next = ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F8));
         egui::CentralPanel::default()
@@ -211,6 +239,21 @@ impl ContractsPane {
                     return;
                 }
             }
+        }
+    }
+
+    fn poll_hotkey(&mut self) {
+        let Some(hotkey) = &self.hotkey else {
+            return;
+        };
+        for capture in hotkey.poll() {
+            self.status = match capture {
+                Capture::Saved(path) => (
+                    format!("Captured {}, reading...", file_name(&path)),
+                    theme::MUTED,
+                ),
+                Capture::Failed(e) => (format!("Capture failed: {e}"), theme::BAD),
+            };
         }
     }
 
@@ -313,9 +356,18 @@ impl ContractsPane {
         }
     }
 
-    /// Entries in board order: oldest first.
+    /// Entries by age: oldest first, so `#N` is the Nth (numbers, export, Routes).
     fn board_entries(&self) -> Vec<&Entry> {
         self.store.board()
+    }
+
+    /// Entries in the order the board shows them (the newest/oldest first toggle).
+    fn shown_entries(&self) -> Vec<&Entry> {
+        let mut entries = self.store.board();
+        if self.prefs.newest_first {
+            entries.reverse();
+        }
+        entries
     }
 
     /// `#N` of an entry on the board.
@@ -326,10 +378,10 @@ impl ContractsPane {
             .map(|i| i + 1)
     }
 
-    /// Every field that needs the player, in board then reading order.
+    /// Every field that needs the player, in shown then reading order.
     fn to_check(&self) -> Vec<(u64, Field)> {
         let mut out = Vec::new();
-        for e in self.board_entries() {
+        for e in self.shown_entries() {
             let Some(r) = self.reviews.get(&e.id) else {
                 continue;
             };
@@ -342,9 +394,9 @@ impl ContractsPane {
         out
     }
 
-    /// Sort key of a field on the board: (contract position, field position).
+    /// Sort key of a field on the board: (shown contract position, field position).
     fn board_order(&self, x: (u64, Field)) -> Option<(usize, usize)> {
-        let pos = self.board_entries().iter().position(|e| e.id == x.0)?;
+        let pos = self.shown_entries().iter().position(|e| e.id == x.0)?;
         let e = self.store.get(x.0)?;
         let field = fields::all(&e.contract).iter().position(|f| *f == x.1)?;
         Some((pos, field))
@@ -399,6 +451,20 @@ impl ContractsPane {
                     .collect();
                 self.paste = board_text::write(&objectives);
             }
+            let order = if self.prefs.newest_first {
+                "Newest first"
+            } else {
+                "Oldest first"
+            };
+            if small_button(ui, order)
+                .on_hover_text("Order of the list (numbers stay by age)")
+                .clicked()
+            {
+                self.prefs.newest_first = !self.prefs.newest_first;
+                if let Err(e) = self.prefs.save(self.store.dir()) {
+                    self.error = Some(format!("Couldn't save: {e:#}"));
+                }
+            }
             self.clear_button(ui, count);
             let label = format!("Next to check ({}) \u{b7} F8", to_check.len());
             let button = egui::Button::new(RichText::new(label).size(13.0).color(theme::WARN));
@@ -436,7 +502,11 @@ impl ContractsPane {
         let mut edits = Vec::new();
         let mut focused = None;
         let ids: Vec<u64> = self.board_entries().iter().map(|e| e.id).collect();
-        for (i, id) in ids.iter().enumerate() {
+        let shown: Vec<u64> = self.shown_entries().iter().map(|e| e.id).collect();
+        for id in &shown {
+            let Some(i) = ids.iter().position(|x| x == id) else {
+                continue;
+            };
             let (Some(entry), Some(reviewed)) = (self.store.get(*id), self.reviews.get(id)) else {
                 continue;
             };
@@ -518,6 +588,7 @@ impl ContractsPane {
             (Stroke::new(1.0_f32, theme::LINE), theme::PANEL)
         };
         let (pending, status) = (worker.pending(), worker.status().map(str::to_owned));
+        let has_hotkey = self.hotkey.is_some();
         let response = egui::Frame::new()
             .stroke(stroke)
             .fill(fill)
@@ -539,6 +610,16 @@ impl ContractsPane {
                         .color(theme::MUTED)
                         .size(12.5),
                     );
+                    if has_hotkey {
+                        ui.label(
+                            RichText::new(format!(
+                                "In game, press {} on a contract to capture it",
+                                hotkey::LABEL
+                            ))
+                            .color(theme::MUTED)
+                            .size(12.5),
+                        );
+                    }
                     if pending > 0 {
                         ui.horizontal(|ui| {
                             ui.spinner();

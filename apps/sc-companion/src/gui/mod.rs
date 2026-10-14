@@ -156,6 +156,10 @@ impl eframe::App for CompanionApp {
             ));
             self.routes = Some(RoutesPane::new(data.clone(), self.args.contracts_dir()));
         }
+        // In-game captures and finished reads land whichever pane is shown.
+        if let Some(contracts) = &mut self.contracts {
+            contracts.background();
+        }
         // Screenshots dropped on another pane go to the Contracts pane.
         if self.contracts.is_some() && ctx.input(|i| !i.raw.dropped_files.is_empty()) {
             self.pane = Pane::Contracts;

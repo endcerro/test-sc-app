@@ -223,8 +223,7 @@ lowest-CER details read `Pyro II` for `Pyro III`, while a config with slightly h
 - In the reduced preset x3, Sauvola and despeckle are only tried on 4 strong baselines, so their
   axis averages look better than they would in the full grid.
 - Follow-ups: add planet designations (`Pyro III` = Bloom) as aliases in sc-data so parents can
-  be checked against the universe; capture the screen directly (hotkey) instead of dropping
-  screenshot files; read the `|` title separators reliably.
+  be checked against the universe; read the `|` title separators reliably.
 
 ## In the app
 
@@ -251,6 +250,16 @@ cargo run -p sc-companion --release --features ocr -- contract samples/03-redwin
   corrections and, for every screenshot, the raw region text with each line's box and
   engine confidence (to show a value's pixels). Stores of the first version (`<id>.txt` +
   `<id>.ocr.json`) are converted on open.
+- **Capture hotkey** (Windows, OCR builds): **Ctrl+Shift+C** while the game shows a contract
+  grabs the monitor of the focused window (`xcap`) into `<contracts dir>/shots/<unix ms>.png`
+  and queues it like a dropped file, so it is read while the player stays in game. The key is
+  found by polling the keyboard state (`device_query`, i.e. `GetAsyncKeyState`) every 30 ms,
+  not `RegisterHotKey`: Star Citizen reads the keyboard through Raw Input with
+  `RIDEV_NOHOTKEYS`, which makes Windows drop application hotkeys. The game also sees the
+  keys. A black capture (exclusive fullscreen) is rejected with a hint to use Borderless.
+  Captured shots are deleted with their contract; dropped files never are.
+- The board shows the newest contract first by default (toggle "Newest first" / "Oldest
+  first", saved in `board.json`); `#N` is always the Nth oldest, as in the Routes pane.
 - A screenshot whose title, reward and contractor match a saved contract is merged into it
   (`contract_from_shots`, then re-parsed), so dropping 09-1 then 09-2 gives the merged truth.
   A contract the player edited is not re-parsed: the shot is attached and a check asks to

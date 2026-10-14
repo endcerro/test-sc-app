@@ -34,3 +34,7 @@ tempfile.workspace = true
 
 [lints]
 workspace = true
+
+[target."cfg(windows)".dependencies]
+device_query = "4.0.1"
+xcap = "0.9.8"
