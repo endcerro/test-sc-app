@@ -1,0 +1,1749 @@
+[
+ {
+  "UUID": "c82edfb2-3491-46fb-a76f-1e364739855f",
+  "Name": "QV Extraction Station",
+  "Description": "<= UNINITIALIZED =>",
+  "ParentUUID": "77ed5653-bd14-4952-b904-afd79faeef60",
+  "NavIcon": "Default",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": true,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": true,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": true,
+  "Size": 0.1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": null,
+  "LocationHierarchyTag": {
+   "UUID": "65ae3316-b395-41e0-883f-c0506882953c",
+   "Name": "Nyx"
+  },
+  "Type": {
+   "UUID": "e60452a5-b85c-4ab1-97e7-9cefb466f87b",
+   "Name": "Asteroid",
+   "Classification": "Asteroid",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "42cae6b1-7db7-4977-99fa-17ada8fb5729",
+  "Name": "Onyx Facility S1A6",
+  "Description": "This ASD Research Facility is no longer in operation. No tre",
+  "ParentUUID": "f3fa9d13-3fdc-41f3-b5e5-25f0b74c0728",
+  "NavIcon": "Outpost",
+  "RespawnLocationType": "Hospital",
+  "IsScannable": true,
+  "HideInStarmap": true,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": true,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": true,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "2c49d0df-ab02-44d3-ba6d-260889fce11e",
+   "Name": "Stanton1a"
+  },
+  "Type": {
+   "UUID": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "Name": "Outpost",
+   "Classification": "Outpost",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   }
+  ]
+ },
+ {
+  "UUID": "a1b8a311-6465-45dc-873d-e8d06d4372df",
+  "Name": "Stanton Gateway",
+  "Description": "Situated at a strategic location near the Pyro-Stanton jump ",
+  "ParentUUID": "a14bec87-5801-4440-8ca8-35597487ac9a",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": true,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1200,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 8000,
+   "ArrivalRadius": 24000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 25000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "Name": "Manmade",
+   "Classification": "Manmade",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "87e3c2af-000c-412f-b4d9-220377908eba",
+   "Name": "UEE",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "ce1f9207-36f2-4cc6-b93a-ebdf6b1f777d",
+   "Name": "SpaceStation",
+   "DisplayName": "Nav Point",
+   "TagUUID": "49df9f43-405a-41a5-a119-f94e7063def4",
+   "TagName": "SpaceStation",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1fe6d52d-6c5d-4eb8-b620-3a6ab6477935",
+    "Name": "Docking",
+    "DisplayName": "Docking"
+   },
+   {
+    "UUID": "e7534915-ab67-4f62-9599-ca139a4eb60a",
+    "Name": "Clinic",
+    "DisplayName": "Clinic"
+   },
+   {
+    "UUID": "7618a59c-75f4-4f63-9c51-d39c3cc58a75",
+    "Name": "Refinery",
+    "DisplayName": "Refinery"
+   },
+   {
+    "UUID": "02905cad-b6ef-4e1d-a996-291647200f42",
+    "Name": "Commodity Trading - Loading Dock",
+    "DisplayName": "Loading Dock"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "f2b40e41-e017-4578-83c6-6ce805af3e46",
+    "Name": "Buy Ship Items and Weapons",
+    "DisplayName": "Buy Ship Items/Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "2131b0aa-9e7f-42f0-9970-02a290366679",
+    "Name": "Rent Vehicles",
+    "DisplayName": "Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+  "Name": "Stanton",
+  "Description": "A class-G main sequence star.",
+  "ParentUUID": null,
+  "NavIcon": "Star",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": true,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 696000000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 76560000,
+   "ArrivalRadius": 121800000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 87787540000,
+   "SubPointRadiusMultiplier": 25
+  },
+  "LocationHierarchyTag": {
+   "UUID": "a47673ef-8511-490d-90ea-fd171d99b626",
+   "Name": "Stanton"
+  },
+  "Type": {
+   "UUID": "80846bb9-e389-411f-b50f-f65f3b639b1d",
+   "Name": "Star",
+   "Classification": "Star",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": {
+   "UUID": "87e3c2af-000c-412f-b4d9-220377908eba",
+   "Name": "UEE",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": {
+   "DensityScale": 1,
+   "SizeScale": 50,
+   "InnerRadius": 19000000000,
+   "OuterRadius": 20500000000,
+   "Depth": 29600000
+  },
+  "Amenities": []
+ },
+ {
+  "UUID": "5a529db7-1a4e-45b0-bdcb-a5a0c7a7fc57",
+  "Name": "microTech",
+  "Description": "A terraforming error left the planet with an unnaturally den",
+  "ParentUUID": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+  "NavIcon": "Planet",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": true,
+  "NoAutoBodyRecovery": false,
+  "Size": 1000000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 1010875,
+   "ArrivalRadius": 1050000,
+   "ArrivalPointDetectionOffset": 50000,
+   "AdoptionRadius": 118481500,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "ff4d704a-7840-4577-ba64-7d4bd709ab9d",
+   "Name": "Stanton4"
+  },
+  "Type": {
+   "UUID": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "Name": "Planet",
+   "Classification": "Planet",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "596cdbc9-71a2-4e9a-9461-4e9fe0090bef",
+   "Name": "microTech",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "4f42ced7-7ecc-4acc-b8c5-fbdd337ea052",
+  "Name": "RSI Event Platform",
+  "Description": "<= UNINITIALIZED =>",
+  "ParentUUID": "5a529db7-1a4e-45b0-bdcb-a5a0c7a7fc57",
+  "NavIcon": "Default",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "4969b9e4-4b1e-45b4-b335-506bbf7af476",
+   "Name": "PointOfInterest",
+   "Classification": "<= UNINITIALIZED =>",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "6e1132cc-8abd-429a-8008-2bd1278d4656",
+  "Name": "RSI Event Platform",
+  "Description": "<= UNINITIALIZED =>",
+  "ParentUUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "NavIcon": "Default",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "4969b9e4-4b1e-45b4-b335-506bbf7af476",
+   "Name": "PointOfInterest",
+   "Classification": "<= UNINITIALIZED =>",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "2c80f568-7408-4a68-bb42-acf286eac204",
+  "Name": "RSI Event Platform",
+  "Description": "<= UNINITIALIZED =>",
+  "ParentUUID": "f3fa9d13-3fdc-41f3-b5e5-25f0b74c0728",
+  "NavIcon": "Default",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "4969b9e4-4b1e-45b4-b335-506bbf7af476",
+   "Name": "PointOfInterest",
+   "Classification": "<= UNINITIALIZED =>",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "35a9f8f5-8f80-4796-83db-7d7362baeb9a",
+  "Name": "ArcCorp",
+  "Description": "Buildings cover a majority of the planet’s surface with resi",
+  "ParentUUID": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+  "NavIcon": "Planet",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": true,
+  "NoAutoBodyRecovery": false,
+  "Size": 800000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 807130,
+   "ArrivalRadius": 880000,
+   "ArrivalPointDetectionOffset": 20000,
+   "AdoptionRadius": 283039200,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "67508ea1-f2a5-4e1a-a045-2c1378c4b89e",
+   "Name": "Stanton3"
+  },
+  "Type": {
+   "UUID": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "Name": "Planet",
+   "Classification": "Planet",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "61e48e63-6822-4f67-9648-d7b884281bd4",
+   "Name": "ArcCorp",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "c6535844-c615-494e-9dc1-c2d0c6e7190a",
+  "Name": "Area18",
+  "Description": "Area18 is one of the main commercial ports for interplanetar",
+  "ParentUUID": "35a9f8f5-8f80-4796-83db-7d7362baeb9a",
+  "NavIcon": "LandingZone",
+  "RespawnLocationType": "Other",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "d68b137c-28c4-4c14-8a29-19e83a586b6d",
+   "Name": "LandingZone",
+   "Classification": "Settlement",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "09641553-4f97-41fa-900d-49f65fce7756",
+   "Name": "LandingZone",
+   "DisplayName": "Landing Pad",
+   "TagUUID": "aaf72aec-a7a8-402b-b55f-608a3e7f4f03",
+   "TagName": "LandingZone",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "610a2197-c2ba-4128-ada3-77390f41c48d",
+    "Name": "Hangar XL",
+    "DisplayName": "Hangar (XL)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "9dfc785e-cb15-4e2e-87e3-8d17b825a828",
+    "Name": "Hospital",
+    "DisplayName": "Hospital"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "f2b40e41-e017-4578-83c6-6ce805af3e46",
+    "Name": "Buy Ship Items and Weapons",
+    "DisplayName": "Buy Ship Items/Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "4570fbad-2ac8-4c32-bf2d-54fa5de9e43e",
+    "Name": "Buy and Rent Vehicles",
+    "DisplayName": "Buy/Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "Name": "Hurston",
+  "Description": "A wealth of ore and other resources are mined on Hurston to ",
+  "ParentUUID": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+  "NavIcon": "Planet",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": true,
+  "NoAutoBodyRecovery": false,
+  "Size": 1000000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 1008900,
+   "ArrivalRadius": 1050000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 128354900,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "13abec13-80ce-4fda-917a-c2e2225b0268",
+   "Name": "Stanton1"
+  },
+  "Type": {
+   "UUID": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "Name": "Planet",
+   "Classification": "Planet",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "94f43714-09f8-488e-b7a9-cbc2404fc408",
+   "Name": "Hurston Dynamics",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "f1759f46-e3c0-4dc1-94bc-c94488b58913",
+  "Name": "Lorville",
+  "Description": "The capital of Hurston and the corporate headquarters for th",
+  "ParentUUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "NavIcon": "LandingZone",
+  "RespawnLocationType": "Other",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "a5cffce2-7bdc-4871-9f1e-e315993a2cc9",
+   "Name": "Lorville"
+  },
+  "Type": {
+   "UUID": "d68b137c-28c4-4c14-8a29-19e83a586b6d",
+   "Name": "LandingZone",
+   "Classification": "Settlement",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "09641553-4f97-41fa-900d-49f65fce7756",
+   "Name": "LandingZone",
+   "DisplayName": "Landing Pad",
+   "TagUUID": "aaf72aec-a7a8-402b-b55f-608a3e7f4f03",
+   "TagName": "LandingZone",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "610a2197-c2ba-4128-ada3-77390f41c48d",
+    "Name": "Hangar XL",
+    "DisplayName": "Hangar (XL)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "10c8aba4-80f7-43bd-a1f6-3396f60394df",
+    "Name": "Garage",
+    "DisplayName": "Garage"
+   },
+   {
+    "UUID": "9dfc785e-cb15-4e2e-87e3-8d17b825a828",
+    "Name": "Hospital",
+    "DisplayName": "Hospital"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "f2b40e41-e017-4578-83c6-6ce805af3e46",
+    "Name": "Buy Ship Items and Weapons",
+    "DisplayName": "Buy Ship Items/Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "4570fbad-2ac8-4c32-bf2d-54fa5de9e43e",
+    "Name": "Buy and Rent Vehicles",
+    "DisplayName": "Buy/Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "ab29f65e-c792-4b1f-b23d-5810cb0ef416",
+  "Name": "Everus Harbor",
+  "Description": "Hurston's primary port of call for Lorville for all large-sc",
+  "ParentUUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "NavIcon": "Station",
+  "RespawnLocationType": "PrisonExit",
+  "IsScannable": true,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": true,
+  "NoAutoBodyRecovery": false,
+  "Size": 1200,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 8000,
+   "ArrivalRadius": 24000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 25000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "Name": "Manmade",
+   "Classification": "Manmade",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "ce1f9207-36f2-4cc6-b93a-ebdf6b1f777d",
+   "Name": "SpaceStation",
+   "DisplayName": "Nav Point",
+   "TagUUID": "49df9f43-405a-41a5-a119-f94e7063def4",
+   "TagName": "SpaceStation",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1fe6d52d-6c5d-4eb8-b620-3a6ab6477935",
+    "Name": "Docking",
+    "DisplayName": "Docking"
+   },
+   {
+    "UUID": "e7534915-ab67-4f62-9599-ca139a4eb60a",
+    "Name": "Clinic",
+    "DisplayName": "Clinic"
+   },
+   {
+    "UUID": "02905cad-b6ef-4e1d-a996-291647200f42",
+    "Name": "Commodity Trading - Loading Dock",
+    "DisplayName": "Loading Dock"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "f3fa9d13-3fdc-41f3-b5e5-25f0b74c0728",
+  "Name": "Arial",
+  "Description": "This moon was named after the 3rd CEO of Hurston Dynamics, A",
+  "ParentUUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "NavIcon": "Moon",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": true,
+  "NoAutoBodyRecovery": false,
+  "Size": 344500,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 349550,
+   "ArrivalRadius": 511725,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 1378000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "2c49d0df-ab02-44d3-ba6d-260889fce11e",
+   "Name": "Stanton1a"
+  },
+  "Type": {
+   "UUID": "4af1132e-d980-482d-823f-f713a196b9aa",
+   "Name": "Moon",
+   "Classification": "Moon",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "131a4315-acf4-4ebc-aa93-a4341d3bd596",
+  "Name": "QV Logistics Station",
+  "Description": "[ CLOSED ] This logistics station is operated by QV Planetar",
+  "ParentUUID": "77ed5653-bd14-4952-b904-afd79faeef60",
+  "NavIcon": "Default",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": true,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": true,
+  "Size": 0.1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": null,
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "Name": "Outpost",
+   "Classification": "Outpost",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "5de4be76-7d6c-47e3-ab7b-9d344d27f506",
+  "Name": "Pyro-Stanton Jump Point",
+  "Description": "This jump point connects Pyro to the Stanton system.",
+  "ParentUUID": "a1b8a311-6465-45dc-873d-e8d06d4372df",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": false,
+  "HideInStarmap": true,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 313900,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 10500,
+   "ArrivalRadius": 18000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 500000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "24975610-8f9b-442c-8f90-4e58f660e8f7",
+   "Name": "Anomaly",
+   "Classification": "Anomaly",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": {
+   "UUID": "87e3c2af-000c-412f-b4d9-220377908eba",
+   "Name": "UEE",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "a14bec87-5801-4440-8ca8-35597487ac9a",
+  "Name": "Pyro",
+  "Description": "A K-type main sequence flare star.",
+  "ParentUUID": null,
+  "NavIcon": "Star",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": true,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 57072000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 599256000,
+   "ArrivalRadius": 60075600,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 161760200000,
+   "SubPointRadiusMultiplier": 7.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "d468664d-6097-42c8-988e-0ccb0533f93e",
+   "Name": "Pyro"
+  },
+  "Type": {
+   "UUID": "80846bb9-e389-411f-b50f-f65f3b639b1d",
+   "Name": "Star",
+   "Classification": "Star",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": {
+   "UUID": "d574e48a-d8bd-47d5-8ffd-1210fea81a31",
+   "Name": "Ungoverned",
+   "BaseFine": 0,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "8c462714-a82e-4d91-8d13-33b325a8efa5",
+  "Name": "Terminus",
+  "Description": "Terminus is a frigid, barely-habitable planet with a methane",
+  "ParentUUID": "a14bec87-5801-4440-8ca8-35597487ac9a",
+  "NavIcon": "Planet",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": true,
+  "NoAutoBodyRecovery": false,
+  "Size": 285000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 293000,
+   "ArrivalRadius": 449250,
+   "ArrivalPointDetectionOffset": 6750,
+   "AdoptionRadius": 494175,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "a6b6468b-c0ba-4513-96ac-93ff91208e60",
+   "Name": "Pyro6"
+  },
+  "Type": {
+   "UUID": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "Name": "Planet",
+   "Classification": "Planet",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "77ed5653-bd14-4952-b904-afd79faeef60",
+  "Name": "Nyx",
+  "Description": "",
+  "ParentUUID": null,
+  "NavIcon": "Star",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": true,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 57072000,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 599256000,
+   "ArrivalRadius": 60075600,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 161760200000,
+   "SubPointRadiusMultiplier": 7.5
+  },
+  "LocationHierarchyTag": {
+   "UUID": "65ae3316-b395-41e0-883f-c0506882953c",
+   "Name": "Nyx"
+  },
+  "Type": {
+   "UUID": "80846bb9-e389-411f-b50f-f65f3b639b1d",
+   "Name": "Star",
+   "Classification": "Star",
+   "SpawnNavPoints": true,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": {
+   "UUID": "d574e48a-d8bd-47d5-8ffd-1210fea81a31",
+   "Name": "Ungoverned",
+   "BaseFine": 0,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "80a0a96d-4c24-4961-8422-3e9a5a98a98d",
+  "Name": "<= UNINITIALIZED =>",
+  "Description": "<= UNINITIALIZED =>",
+  "ParentUUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "NavIcon": "Outpost",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "Name": "Outpost",
+   "Classification": "Outpost",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   }
+  ]
+ },
+ {
+  "UUID": "59b22155-405f-4785-9f73-d2028b46f5c3",
+  "Name": "Pyro Gateway",
+  "Description": "Situated at a strategic location near the jump point, the Py",
+  "ParentUUID": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": true,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1200,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 8000,
+   "ArrivalRadius": 24000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 25000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "Name": "Manmade",
+   "Classification": "Manmade",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "87e3c2af-000c-412f-b4d9-220377908eba",
+   "Name": "UEE",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "ce1f9207-36f2-4cc6-b93a-ebdf6b1f777d",
+   "Name": "SpaceStation",
+   "DisplayName": "Nav Point",
+   "TagUUID": "49df9f43-405a-41a5-a119-f94e7063def4",
+   "TagName": "SpaceStation",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1fe6d52d-6c5d-4eb8-b620-3a6ab6477935",
+    "Name": "Docking",
+    "DisplayName": "Docking"
+   },
+   {
+    "UUID": "e7534915-ab67-4f62-9599-ca139a4eb60a",
+    "Name": "Clinic",
+    "DisplayName": "Clinic"
+   },
+   {
+    "UUID": "7618a59c-75f4-4f63-9c51-d39c3cc58a75",
+    "Name": "Refinery",
+    "DisplayName": "Refinery"
+   },
+   {
+    "UUID": "02905cad-b6ef-4e1d-a996-291647200f42",
+    "Name": "Commodity Trading - Loading Dock",
+    "DisplayName": "Loading Dock"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "f2b40e41-e017-4578-83c6-6ce805af3e46",
+    "Name": "Buy Ship Items and Weapons",
+    "DisplayName": "Buy Ship Items/Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "2131b0aa-9e7f-42f0-9970-02a290366679",
+    "Name": "Rent Vehicles",
+    "DisplayName": "Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "f497eb74-7875-42e6-9694-632cb4a76f8c",
+  "Name": "Stanton-Pyro Jump Point",
+  "Description": "This jump point connects Stanton to the unclaimed Pyro syste",
+  "ParentUUID": "59b22155-405f-4785-9f73-d2028b46f5c3",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": false,
+  "HideInStarmap": true,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 313900,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 10500,
+   "ArrivalRadius": 18000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 500000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "24975610-8f9b-442c-8f90-4e58f660e8f7",
+   "Name": "Anomaly",
+   "Classification": "Anomaly",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": {
+   "UUID": "87e3c2af-000c-412f-b4d9-220377908eba",
+   "Name": "UEE",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "5f6e91f1-f6c3-4dee-a6ba-723c9f02808e",
+  "Name": "PYAM-FARSTAT-5-3",
+  "Description": "ATTENTION: This station is no longer in service.",
+  "ParentUUID": "a14bec87-5801-4440-8ca8-35597487ac9a",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": true,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1200,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 8000,
+   "ArrivalRadius": 24000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 25000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "4895b5bb-94ac-470a-bf6f-084a54a09be5",
+   "Name": "Manmade_VisibleOnInteraction",
+   "Classification": "Manmade",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "5b5e4ff5-f153-4b56-9f07-987520d3ce62",
+   "Name": "Rough & Ready",
+   "BaseFine": 0,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "ce1f9207-36f2-4cc6-b93a-ebdf6b1f777d",
+   "Name": "SpaceStation",
+   "DisplayName": "Nav Point",
+   "TagUUID": "49df9f43-405a-41a5-a119-f94e7063def4",
+   "TagName": "SpaceStation",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1fe6d52d-6c5d-4eb8-b620-3a6ab6477935",
+    "Name": "Docking",
+    "DisplayName": "Docking"
+   },
+   {
+    "UUID": "e7534915-ab67-4f62-9599-ca139a4eb60a",
+    "Name": "Clinic",
+    "DisplayName": "Clinic"
+   },
+   {
+    "UUID": "7618a59c-75f4-4f63-9c51-d39c3cc58a75",
+    "Name": "Refinery",
+    "DisplayName": "Refinery"
+   },
+   {
+    "UUID": "02905cad-b6ef-4e1d-a996-291647200f42",
+    "Name": "Commodity Trading - Loading Dock",
+    "DisplayName": "Loading Dock"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "f2b40e41-e017-4578-83c6-6ce805af3e46",
+    "Name": "Buy Ship Items and Weapons",
+    "DisplayName": "Buy Ship Items/Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "2131b0aa-9e7f-42f0-9970-02a290366679",
+    "Name": "Rent Vehicles",
+    "DisplayName": "Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "689ff011-e2e9-4f6e-b5a3-7cea4bbc86c7",
+  "Name": "HUR-L1 Green Glade Station",
+  "Description": "Located at the L1 Lagrange point of Hurston (Stanton I), Res",
+  "ParentUUID": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": true,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1200,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 8000,
+   "ArrivalRadius": 24000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 25000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "4895b5bb-94ac-470a-bf6f-084a54a09be5",
+   "Name": "Manmade_VisibleOnInteraction",
+   "Classification": "Manmade",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "ce1f9207-36f2-4cc6-b93a-ebdf6b1f777d",
+   "Name": "SpaceStation",
+   "DisplayName": "Nav Point",
+   "TagUUID": "49df9f43-405a-41a5-a119-f94e7063def4",
+   "TagName": "SpaceStation",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1fe6d52d-6c5d-4eb8-b620-3a6ab6477935",
+    "Name": "Docking",
+    "DisplayName": "Docking"
+   },
+   {
+    "UUID": "e7534915-ab67-4f62-9599-ca139a4eb60a",
+    "Name": "Clinic",
+    "DisplayName": "Clinic"
+   },
+   {
+    "UUID": "7618a59c-75f4-4f63-9c51-d39c3cc58a75",
+    "Name": "Refinery",
+    "DisplayName": "Refinery"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "2131b0aa-9e7f-42f0-9970-02a290366679",
+    "Name": "Rent Vehicles",
+    "DisplayName": "Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "1c585a2e-73c4-4bc5-8922-e0b434b8c8ea",
+  "Name": "Ruin Station",
+  "Description": "A Gold Horizon platform orbiting Pyro VI. It was owned and o",
+  "ParentUUID": "8c462714-a82e-4d91-8d13-33b325a8efa5",
+  "NavIcon": "Station",
+  "RespawnLocationType": "Other",
+  "IsScannable": true,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1200,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 8000,
+   "ArrivalRadius": 24000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 25000,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "Name": "Manmade",
+   "Classification": "Manmade",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": {
+   "UUID": "5b5e4ff5-f153-4b56-9f07-987520d3ce62",
+   "Name": "Rough & Ready",
+   "BaseFine": 0,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": {
+   "UUID": "ce1f9207-36f2-4cc6-b93a-ebdf6b1f777d",
+   "Name": "SpaceStation",
+   "DisplayName": "Nav Point",
+   "TagUUID": "49df9f43-405a-41a5-a119-f94e7063def4",
+   "TagName": "SpaceStation",
+   "IsObjectOfInterest": false
+  },
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "1fe6d52d-6c5d-4eb8-b620-3a6ab6477935",
+    "Name": "Docking",
+    "DisplayName": "Docking"
+   },
+   {
+    "UUID": "e7534915-ab67-4f62-9599-ca139a4eb60a",
+    "Name": "Clinic",
+    "DisplayName": "Clinic"
+   },
+   {
+    "UUID": "7618a59c-75f4-4f63-9c51-d39c3cc58a75",
+    "Name": "Refinery",
+    "DisplayName": "Refinery"
+   },
+   {
+    "UUID": "02905cad-b6ef-4e1d-a996-291647200f42",
+    "Name": "Commodity Trading - Loading Dock",
+    "DisplayName": "Loading Dock"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   },
+   {
+    "UUID": "9625042e-95ca-48e3-b6ed-f1cc214048f1",
+    "Name": "Buy Weapons",
+    "DisplayName": "Buy Weapons"
+   },
+   {
+    "UUID": "f2b40e41-e017-4578-83c6-6ce805af3e46",
+    "Name": "Buy Ship Items and Weapons",
+    "DisplayName": "Buy Ship Items/Weapons"
+   },
+   {
+    "UUID": "ef9ab9d9-81b5-4a4a-8d23-5e69d93b0dd9",
+    "Name": "Buy Armor",
+    "DisplayName": "Buy Armor"
+   },
+   {
+    "UUID": "678d6274-aba3-4749-abfc-31fd2eb7917a",
+    "Name": "Buy Clothing",
+    "DisplayName": "Buy Clothing"
+   },
+   {
+    "UUID": "2131b0aa-9e7f-42f0-9970-02a290366679",
+    "Name": "Rent Vehicles",
+    "DisplayName": "Rent Vehicles"
+   },
+   {
+    "UUID": "65423473-aab4-4ab7-a836-228da342fa31",
+    "Name": "Food Court",
+    "DisplayName": "Food Court"
+   }
+  ]
+ },
+ {
+  "UUID": "c9c137cf-c520-47ee-9e6d-5d653dfbe201",
+  "Name": "Stanton System",
+  "Description": "While the UEE still controls the rights to the system overal",
+  "ParentUUID": null,
+  "NavIcon": "Default",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": true,
+  "HideInWorld": true,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": true,
+  "OnlyShowWhenParentSelected": false,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 0.1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": null,
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "32ed44de-920b-43ce-b55d-82cc4ef9fa59",
+   "Name": "SolarSystem",
+   "Classification": "Solar System",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": false
+  },
+  "Jurisdiction": {
+   "UUID": "87e3c2af-000c-412f-b4d9-220377908eba",
+   "Name": "UEE",
+   "BaseFine": 125,
+   "MaxStolenGoodsPossessionScu": 1,
+   "IsPrison": false
+  },
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": []
+ },
+ {
+  "UUID": "54a7fb84-3d4b-49ca-9b70-6f13bac89c54",
+  "Name": "Covalex Distribution Centre S1DC06",
+  "Description": "One of many distribution centres that belong to the vast Cov",
+  "ParentUUID": "551af60b-7727-4936-acc7-763d25d7a1de",
+  "NavIcon": "Outpost",
+  "RespawnLocationType": "None",
+  "IsScannable": false,
+  "HideInStarmap": false,
+  "HideInWorld": false,
+  "HideWhenInAdoptionRadius": false,
+  "BlockTravel": false,
+  "OnlyShowWhenParentSelected": true,
+  "ShowOrbitLine": false,
+  "NoAutoBodyRecovery": false,
+  "Size": 1,
+  "MinimumDisplaySize": 0,
+  "QuantumTravel": {
+   "ObstructionRadius": 0,
+   "ArrivalRadius": 20000,
+   "ArrivalPointDetectionOffset": 10000,
+   "AdoptionRadius": 0,
+   "SubPointRadiusMultiplier": 1.5
+  },
+  "LocationHierarchyTag": null,
+  "Type": {
+   "UUID": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "Name": "Outpost",
+   "Classification": "Outpost",
+   "SpawnNavPoints": false,
+   "ValidQuantumTravelDestination": true
+  },
+  "Jurisdiction": null,
+  "Affiliation": null,
+  "RadarContactType": null,
+  "AsteroidRing": null,
+  "Amenities": [
+   {
+    "UUID": "e9192fcd-d722-4599-b057-6e9aa5ed8fc1",
+    "Name": "Hangar L",
+    "DisplayName": "Hangar (L)"
+   },
+   {
+    "UUID": "56d20b90-2e44-4cca-ac14-9f537f7d285e",
+    "Name": "Landing Pad M",
+    "DisplayName": "Landing Pad (M)"
+   },
+   {
+    "UUID": "1178cca7-dd66-4b9d-a22f-5515710a5f9e",
+    "Name": "Vehicle Services",
+    "DisplayName": "Vehicle Services"
+   },
+   {
+    "UUID": "a783bfb9-0f0a-491f-864b-945a49ef5da4",
+    "Name": "Commodity Trading - Freight Elevator",
+    "DisplayName": "Commodity Trading"
+   }
+  ]
+ }
+]

@@ -1,0 +1,16 @@
+[package]
+name = "sc-universe"
+description = "Star Citizen universe model: location tree, positions, distances and name lookup. Pure, no IO."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+strsim.workspace = true
+thiserror.workspace = true
+unicode-normalization.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

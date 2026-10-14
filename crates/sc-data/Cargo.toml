@@ -1,0 +1,22 @@
+[package]
+name = "sc-data"
+description = "Data sources (scunpacked-data, later UEX) that build an sc-universe::Universe, with on-disk caching."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sc-universe.workspace = true
+directories.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+ureq.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
