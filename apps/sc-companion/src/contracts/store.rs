@@ -180,6 +180,11 @@ impl ContractStore {
         &self.entries
     }
 
+    /// Board order: oldest first, so the contract numbered `#N` on the board is the Nth.
+    pub fn board(&self) -> Vec<&Entry> {
+        self.entries.iter().rev().collect()
+    }
+
     pub fn get(&self, id: u64) -> Option<&Entry> {
         self.entries.iter().find(|e| e.id == id)
     }

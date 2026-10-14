@@ -7,6 +7,7 @@
 mod cli;
 mod contracts;
 mod gui;
+mod routes;
 
 use std::path::PathBuf;
 

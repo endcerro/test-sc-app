@@ -5,7 +5,11 @@
 ```text
 apps/sc-companion  ──►  sc-data  ──►  sc-universe
       (bin)            (sources,        (model, pure)
-        │               cache, http)        ▲
+        │               cache, http)        ▲     ▲
+        │                                   │     │ route, nearest_body
+        │                                   │   sc-planner ◄── apps/sc-companion
+        │                                   │   (contracts → routes, pure)
+        │                                   │     │
         │                                   │ normalize, find_fuzzy
         └──────────► sc-ocr        sc-contracts ◄── apps/sc-companion
 tools/ocr-bench ──►  (pixels → text)  (text → HaulingContract, pure)
@@ -20,6 +24,8 @@ tools/ocr-bench ──►  (pixels → text)  (text → HaulingContract, pure)
   `Contract::from_objectives` merges `Deliver` lines of the same commodity from the same
   single pickup; `to_objectives` goes back.
 
+- **sc-planner**: hauling route planning on `Contract` flows and the `Universe`, ported from
+  the old Hauling Planner; see "Route planning" below.
 - **sc-universe**: no IO. Owns the model and all algorithms on it (tree queries, distances,
   routing, name lookup). Everything else depends on it.
 - **sc-data**: turns external data into a `Universe`. One module per source
@@ -88,7 +94,7 @@ Warnings never fail the build; they're returned next to the `Universe`.
 
 ### GUI
 
-`gui/mod.rs` is the shell: a top bar with pane tabs (Map, Contracts; Trading is a placeholder)
+`gui/mod.rs` is the shell: a top bar with pane tabs (Map, Contracts, Routes; Trading is a placeholder)
 and data provenance, a spinner while loading, an error + Retry on failure. Each pane owns its
 side panels and central area.
 
@@ -133,6 +139,15 @@ oldest first (`#1` at the top):
 - The "+" for a place is disabled when it would give a line several pickups *and* several
   drop-offs. Reviews are cached per entry until it changes.
 
+**Routes pane** (`gui/routes/`, ported from the hauling planner's setup bar and results
+column): plans the Contracts pane's saved contracts in board order (so `#N` matches) with the
+ship and settings of `routes::RouteSetup` (`planner.json` in the contracts dir, saved on
+change). Planning runs on a thread with a clone of the Contracts pane's `Places`, so taught
+names resolve. The header counts fields still to check and duplicate pairs, and says when the
+contracts, ship or settings changed since the plan. Each route card shows reward, time,
+aUEC/h, a trip strip (stops spaced by time; jumps dashed thick, guesses red), a cargo strip
+(estimate and hard maximum marked), warnings and a stop table.
+
 ### Name lookup (for OCR)
 
 `normalize()` folds Unicode, case, punctuation, apostrophes, `&`, and `centre/center`.
@@ -149,6 +164,24 @@ The name index holds own names **and aliases**; a `Match { id, score, alias }` s
 
 Alias sources: `labels.json` venue strings and the curated `crates/sc-data/data/aliases.json`
 (see `data-sources.md`); UEX terminal names will be the next one.
+
+## Route planning (`sc-planner`)
+
+- `plan()` turns each contract line into one order per drop-off (one pickup → N drop-offs keeps
+  each drop-off's SCU; N pickups → one drop-off is split evenly, flagged); a line marked loaded
+  has no pickups. Contracts that can't be planned (no reward, unknown or ambiguous place,
+  several pickups *and* drop-offs, too big for the hard maximum alone) are left out with the
+  reason. Place names go through a resolver the caller passes (the app's `Places::resolve`).
+- `travel::leg` gives the minutes between two places: 0 for the same place; the pilot's hop
+  time when both are on or around the same planet or moon (`nearest_body`); otherwise
+  `Universe::route`, each straight leg a quantum jump (spool + distance / speed) plus the stop
+  time per jump point crossed; a 120 Gm guess, flagged, when there is no position or route.
+- `route::best_route` orders the stops of a contract set: exact A* over (pickups done,
+  orders delivered, location), heuristic + local search above 150k states.
+  `select::select` beam-searches contract sets (at most 10 minus those held) for the goal
+  (best aUEC/h over a minimum session, most reward in a time budget, or all contracts
+  fastest) and keeps distinct alternatives; `plan` labels them, adds warnings and says why
+  each other contract isn't in the top route. Tests check both against brute force.
 
 ## Loading pipeline (scunpacked)
 
@@ -178,6 +211,5 @@ labels-derived) are resolved against the kept nodes (`scunpacked/aliases.rs`).
 - `sc-data::uex`: terminals + prices, joined onto the universe (see `data-sources.md`).
 - More aliases: UEX terminal names, common abbreviations; map `trade_locations` UUIDs (hauling
   contracts) onto locations.
-- Trading pane; map overlays for routes once the optimizer exists.
-- Screen capture (hotkey) instead of dropping screenshot files; commodity terminal screens; the cargo route optimizer on top of `Universe::route` and
-  `Contract` flows.
+- Trading pane; a map overlay for the selected hauling route.
+- Screen capture (hotkey) instead of dropping screenshot files; commodity terminal screens; a trading route optimizer next to the hauling planner.

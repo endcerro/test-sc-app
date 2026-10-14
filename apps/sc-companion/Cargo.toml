@@ -14,6 +14,7 @@ ocr = ["sc-ocr/paddle", "sc-ocr/download"]
 sc-universe.workspace = true
 sc-data.workspace = true
 sc-contracts.workspace = true
+sc-planner.workspace = true
 sc-ocr.workspace = true
 anyhow.workspace = true
 arboard = { version = "3.6", default-features = false }

@@ -1,12 +1,12 @@
-//! Small widgets of the contract board, ported from the hauling planner.
+//! Small widgets shared by the Contracts and Routes panes, ported from the hauling planner.
 //!
 //! Text fields edit a copy and commit on Enter or when focus leaves: half-typed numbers
 //! never reach the contract, and pressing Enter on an unchanged value still commits it
 //! (which confirms a flagged read).
 
 use eframe::egui::{
-    self, Color32, Id, Key, Rect, Response, RichText, Sense, Shape, Stroke, StrokeKind, TextEdit,
-    Ui,
+    self, Color32, Id, Key, Pos2, Rect, Response, RichText, Sense, Shape, Stroke, StrokeKind,
+    TextEdit, Ui,
 };
 
 use crate::contracts::places::PlaceTree;
@@ -91,6 +91,19 @@ pub fn field(
         }
     }
     FieldOut { response, commit }
+}
+
+/// A field for numbers; commits only what parses (`parse` returns None to reject).
+pub fn number<T>(
+    ui: &mut Ui,
+    id: Id,
+    value: &str,
+    width: f32,
+    parse: impl Fn(&str) -> Option<T>,
+) -> Option<T> {
+    field(ui, id, value, width, Mark::None, None)
+        .commit
+        .and_then(|t| parse(&t))
 }
 
 /// The line under a place field saying where the name resolved: `✓ Stanton › Crusader
@@ -312,4 +325,19 @@ pub fn add_button(ui: &mut Ui, tip: &str, enabled: bool, disabled_tip: &str) -> 
     );
     r.on_hover_text(if enabled { tip } else { disabled_tip })
         .clicked()
+}
+
+/// A small rounded badge (the fit indicator).
+pub fn badge(ui: &mut Ui, text: &str, color: Color32, border: Color32) {
+    egui::Frame::new()
+        .stroke(Stroke::new(1.0_f32, border))
+        .corner_radius(99)
+        .inner_margin(egui::Margin::symmetric(8, 2))
+        .show(ui, |ui| {
+            ui.label(RichText::new(text).size(12.0).color(color))
+        });
+}
+
+pub fn dashed_segment(points: [Pos2; 2], stroke: Stroke, dash: f32, gap: f32) -> Vec<Shape> {
+    Shape::dashed_line(&points, stroke, dash, gap)
 }

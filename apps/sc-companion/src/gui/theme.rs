@@ -21,6 +21,7 @@ pub const BAD: Color32 = Color32::from_rgb(0xef, 0x6b, 0x6b);
 pub const GOOD: Color32 = Color32::from_rgb(0x7f, 0xd9, 0x9a);
 pub const REWARD: Color32 = Color32::from_rgb(0xe8, 0xc1, 0x5a);
 pub const CARGO: Color32 = Color32::from_rgb(0xa9, 0x9c, 0xf2);
+pub const TIME: Color32 = Color32::from_rgb(0x5e, 0xc8, 0xe5);
 
 pub const RADIUS: u8 = 8;
 

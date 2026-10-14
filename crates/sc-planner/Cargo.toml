@@ -1,0 +1,18 @@
+[package]
+name = "sc-planner"
+description = "Hauling route planner: which contracts to take and in what order to visit their places. Pure, no IO."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sc-universe.workspace = true
+sc-contracts.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+sc-data.workspace = true
+
+[lints]
+workspace = true

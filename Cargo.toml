@@ -5,6 +5,7 @@ members = [
     "crates/sc-data",
     "crates/sc-contracts",
     "crates/sc-ocr",
+    "crates/sc-planner",
     "apps/sc-companion",
     "tools/ocr-bench",
 ]
@@ -20,6 +21,7 @@ sc-universe = { path = "crates/sc-universe" }
 sc-data = { path = "crates/sc-data" }
 sc-contracts = { path = "crates/sc-contracts" }
 sc-ocr = { path = "crates/sc-ocr" }
+sc-planner = { path = "crates/sc-planner" }
 
 anyhow = "1.0"
 clap = { version = "4.6", features = ["derive"] }

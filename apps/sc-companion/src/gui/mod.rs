@@ -1,15 +1,19 @@
-//! egui/eframe application: a top bar to switch panes (Map, Contracts), one shown at a time.
+//! egui/eframe application: a top bar to switch panes (Map, Contracts, Routes), one shown at
+//! a time.
 
 mod contracts;
 mod loader;
 mod map;
+mod routes;
 pub mod theme;
+mod widgets;
 
 use anyhow::{Result, anyhow};
 use contracts::ContractsPane;
 use eframe::egui;
 use loader::LoadState;
 use map::MapPane;
+use routes::RoutesPane;
 
 use crate::SourceArgs;
 
@@ -33,22 +37,24 @@ pub fn run(args: SourceArgs) -> Result<()> {
 enum Pane {
     Map,
     Contracts,
+    Routes,
     Trading,
 }
 
 impl Pane {
-    const ALL: [Self; 3] = [Self::Map, Self::Contracts, Self::Trading];
+    const ALL: [Self; 4] = [Self::Map, Self::Contracts, Self::Routes, Self::Trading];
 
     fn label(self) -> &'static str {
         match self {
             Self::Map => "Map",
             Self::Contracts => "Contracts",
+            Self::Routes => "Routes",
             Self::Trading => "Trading",
         }
     }
 
     fn available(self) -> bool {
-        matches!(self, Self::Map | Self::Contracts)
+        matches!(self, Self::Map | Self::Contracts | Self::Routes)
     }
 }
 
@@ -58,6 +64,7 @@ struct CompanionApp {
     pane: Pane,
     map: Option<MapPane>,
     contracts: Option<ContractsPane>,
+    routes: Option<RoutesPane>,
 }
 
 impl CompanionApp {
@@ -70,6 +77,7 @@ impl CompanionApp {
             pane: Pane::Map,
             map: None,
             contracts: None,
+            routes: None,
         }
     }
 
@@ -146,6 +154,7 @@ impl eframe::App for CompanionApp {
                 data.clone(),
                 self.args.contracts_dir(),
             ));
+            self.routes = Some(RoutesPane::new(data.clone(), self.args.contracts_dir()));
         }
         // Screenshots dropped on another pane go to the Contracts pane.
         if self.contracts.is_some() && ctx.input(|i| !i.raw.dropped_files.is_empty()) {
@@ -183,6 +192,13 @@ impl eframe::App for CompanionApp {
                 let shown = match self.pane {
                     Pane::Map => self.map.as_mut().map(|map| map.show(ctx)),
                     Pane::Contracts => self.contracts.as_mut().map(|c| c.show(ctx)),
+                    Pane::Routes => match (&mut self.routes, &self.contracts) {
+                        (Some(routes), Some(contracts)) => {
+                            routes.show(ctx, contracts);
+                            Some(())
+                        }
+                        _ => None,
+                    },
                     Pane::Trading => None,
                 };
                 if shown.is_none() {

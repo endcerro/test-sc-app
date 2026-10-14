@@ -3338,6 +3338,7 @@ dependencies = [
  "sc-contracts",
  "sc-data",
  "sc-ocr",
+ "sc-planner",
  "sc-universe",
  "serde",
  "serde_json",
@@ -3386,6 +3387,17 @@ dependencies = [
  "thiserror 2.0.21",
  "ureq",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "sc-planner"
+version = "0.1.0"
+dependencies = [
+ "sc-contracts",
+ "sc-data",
+ "sc-universe",
+ "serde",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

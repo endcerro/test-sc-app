@@ -5,18 +5,17 @@
 
 mod card;
 mod format;
-mod widgets;
 mod worker;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::gui::widgets::{self, primary_button, small_button};
 use eframe::egui::{self, Color32, Key, Modifiers, RichText, Sense, Stroke, TextEdit, Ui};
 use sc_contracts::{Contract, Flow};
 use sc_data::LoadedUniverse;
 use sc_universe::normalize;
-use widgets::{primary_button, small_button};
 use worker::{Outcome, Worker};
 
 use crate::contracts::board_text::{self, Issue};
@@ -165,6 +164,21 @@ impl ContractsPane {
             });
     }
 
+    /// The saved contracts (the Routes pane plans them).
+    pub fn store(&self) -> &ContractStore {
+        &self.store
+    }
+
+    /// Place lookup with the taught names applied.
+    pub fn places(&self) -> &Places {
+        &self.places
+    }
+
+    /// How many fields still need the player ("Next to check").
+    pub fn fields_to_check(&self) -> usize {
+        review::to_check(self.store.entries(), self.lookup()).len()
+    }
+
     // ---- input -----------------------------------------------------------------------
 
     fn take_dropped_files(&mut self, ctx: &egui::Context) {
@@ -301,7 +315,7 @@ impl ContractsPane {
 
     /// Entries in board order: oldest first.
     fn board_entries(&self) -> Vec<&Entry> {
-        self.store.entries().iter().rev().collect()
+        self.store.board()
     }
 
     /// `#N` of an entry on the board.

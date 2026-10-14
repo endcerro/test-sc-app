@@ -8,10 +8,6 @@ use std::collections::HashMap;
 use eframe::egui::{self, Align, Id, Rect, RichText, Stroke, StrokeKind, Ui};
 use sc_universe::Universe;
 
-use super::widgets::{
-    FieldOut, PLACE_CHOICES, add_button, field, labeled, place, place_tree, remove_button,
-    small_button,
-};
 use super::{Edit, Reviewed, Textures, View, format};
 use crate::contracts::Entry;
 use crate::contracts::fields::{self, Field};
@@ -19,6 +15,10 @@ use crate::contracts::places::{PlaceTree, Places};
 use crate::contracts::review::Mark;
 use crate::contracts::sources::{self, Source};
 use crate::gui::theme;
+use crate::gui::widgets::{
+    FieldOut, PLACE_CHOICES, add_button, field, labeled, place, place_tree, remove_button,
+    small_button,
+};
 
 /// Width of a 90-character title, the longest the game shows.
 const TITLE_MAX_W: f32 = 640.0;
