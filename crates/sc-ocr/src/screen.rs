@@ -1,9 +1,11 @@
 //! Reading a whole Contracts screenshot with the settings the benchmark recommends
 //! (`docs/ocr.md`): anchored region crops, max-channel grey, upscaled to ~2160 px of screen
-//! height, 3x3 median, light-on-dark kept.
+//! height, 3x3 median, light-on-dark kept. The highlighted entry of the offer list is read
+//! too, as a fallback for the reward box.
 
 use image::RgbImage;
 
+use crate::layout::selected_offer;
 use crate::preprocess::{Background, Binarize, ColorMode};
 use crate::{Layout, OcrEngine, OcrError, Pipeline, Rect, Region, crop};
 
@@ -45,6 +47,8 @@ pub struct ScreenText {
     pub reward: Vec<ScreenLine>,
     pub details: Vec<ScreenLine>,
     pub objectives: Vec<ScreenLine>,
+    /// The highlighted entry of the offer list; empty when it was not found.
+    pub offer: Vec<ScreenLine>,
 }
 
 /// Lines joined with `\n`.
@@ -65,7 +69,16 @@ pub fn read_region_lines(
     engine: &dyn OcrEngine,
     region: Region,
 ) -> Result<Vec<ScreenLine>, OcrError> {
-    let area = layout.rect(region, REGION_MARGIN);
+    read_area_lines(img, layout.rect(region, REGION_MARGIN), pipeline, engine)
+}
+
+/// Reads one crop of the screenshot; line boxes are mapped back to the screenshot.
+pub fn read_area_lines(
+    img: &RgbImage,
+    area: Rect,
+    pipeline: &Pipeline,
+    engine: &dyn OcrEngine,
+) -> Result<Vec<ScreenLine>, OcrError> {
     let out = engine.recognize(&pipeline.apply(&crop(img, area)))?;
     Ok(out
         .lines
@@ -100,8 +113,9 @@ pub fn read_region(
     Ok(engine.recognize(&processed)?.text())
 }
 
-/// Reads the four regions of a Contracts screenshot, crops anchored on the OFFERS tab. The
-/// regions are read concurrently (engines with a session pool run them in parallel).
+/// Reads the four regions of a Contracts screenshot, crops anchored on the OFFERS tab, and
+/// the highlighted offer list entry. They are read concurrently (engines with a session
+/// pool run them in parallel).
 pub fn read_contract_screen(
     img: &RgbImage,
     engine: &dyn OcrEngine,
@@ -109,18 +123,25 @@ pub fn read_contract_screen(
 ) -> Result<ScreenText, OcrError> {
     let layout = Layout::anchored(img);
     let read = |region| read_region_lines(img, &layout, pipeline, engine, region);
-    let [title, reward, details, objectives] = std::thread::scope(|s| {
+    let read_offer = || match selected_offer(img, &layout) {
+        Some(area) => read_area_lines(img, area, pipeline, engine),
+        None => Ok(Vec::new()),
+    };
+    let panicked = || Err(OcrError::engine(engine.name(), "OCR thread panicked"));
+    let ([title, reward, details, objectives], offer) = std::thread::scope(|s| {
+        let offer = s.spawn(read_offer);
         let handles = Region::ALL.map(|region| s.spawn(move || read(region)));
-        handles.map(|h| {
-            h.join()
-                .unwrap_or_else(|_| Err(OcrError::engine(engine.name(), "OCR thread panicked")))
-        })
+        (
+            handles.map(|h| h.join().unwrap_or_else(|_| panicked())),
+            offer.join().unwrap_or_else(|_| panicked()),
+        )
     });
     Ok(ScreenText {
         title: title?,
         reward: reward?,
         details: details?,
         objectives: objectives?,
+        offer: offer?,
     })
 }
 

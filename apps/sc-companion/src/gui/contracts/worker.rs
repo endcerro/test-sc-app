@@ -13,7 +13,7 @@ use crate::contracts::{ContractReader, ShotText};
 /// A finished screenshot.
 #[derive(Debug)]
 pub enum Outcome {
-    Read(ShotText),
+    Read(Box<ShotText>),
     Failed { path: PathBuf, error: String },
 }
 
@@ -62,7 +62,7 @@ impl Worker {
             for path in job_rx {
                 let result = reader.read(&path, &mut |s| send(Event::Status(s)));
                 let outcome = match result {
-                    Ok(shot) => Outcome::Read(shot),
+                    Ok(shot) => Outcome::Read(Box::new(shot)),
                     Err(e) => Outcome::Failed {
                         path,
                         error: format!("{e:#}"),

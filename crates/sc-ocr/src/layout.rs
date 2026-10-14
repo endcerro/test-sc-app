@@ -65,9 +65,15 @@ pub enum Region {
     Details,
     /// Primary objectives list, below the `PRIMARY OBJECTIVES` header.
     Objectives,
+    /// The highlighted entry of the offer list on the left: title, rounded reward,
+    /// availability, contractor. Not at a fixed place (the list scrolls): found on each
+    /// screenshot by [`selected_offer`], so it is not in [`Region::ALL`]. A fallback for
+    /// the reward box, which the game sometimes draws with its lines on top of each other.
+    Offer,
 }
 
 impl Region {
+    /// The regions at fixed places in the details panel.
     pub const ALL: [Self; 4] = [Self::Title, Self::Reward, Self::Details, Self::Objectives];
 
     pub fn name(self) -> &'static str {
@@ -76,21 +82,27 @@ impl Region {
             Self::Reward => "reward",
             Self::Details => "details",
             Self::Objectives => "objectives",
+            Self::Offer => "offer",
         }
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|r| r.name() == name)
+        Self::ALL
+            .into_iter()
+            .chain([Self::Offer])
+            .find(|r| r.name() == name)
     }
 
     /// Rectangle in the 1920x1080 reference frame, for the panel at [`REF_ANCHOR`].
-    /// Tight around the text; [`Layout::rect`] adds a margin.
+    /// Tight around the text; [`Layout::rect`] adds a margin. For [`Region::Offer`], the
+    /// list column the entry is looked for in.
     pub fn reference_rect(self) -> Rect {
         match self {
             Self::Title => Rect::new(684, 182, 572, 94),
             Self::Reward => Rect::new(1478, 190, 274, 70),
             Self::Details => Rect::new(684, 346, 512, 452),
             Self::Objectives => Rect::new(1234, 344, 512, 452),
+            Self::Offer => OFFER_LIST,
         }
     }
 }
@@ -323,6 +335,61 @@ pub fn bullet_lines(bullets: &[Bullet], area: Rect, scale: f64) -> Vec<(BulletKi
     out
 }
 
+/// The offer list column, reference frame: where the highlighted entry is looked for.
+/// Below the list header, left of the scrollbar.
+const OFFER_LIST: Rect = Rect::new(150, 160, 462, 740);
+
+/// The accent of the selected offer: bright green (verified contracts) or bright red
+/// (unverified ones). The fill varies (green, teal, red), the accent bar on the entry's
+/// left edge does not.
+pub fn is_offer_accent(p: [u8; 3]) -> bool {
+    let [r, g, b] = p.map(i32::from);
+    let green = g >= 140 && g >= r + 50 && g >= b + 15;
+    let red = r >= 140 && r >= g + 60 && r >= b + 40;
+    green || red
+}
+
+/// The entry of the offer list that is highlighted, i.e. the contract shown in the details
+/// panel, in image pixels. Found by its accent: the bar on its left edge (and the border,
+/// when bright enough to connect to the bar). `None` when it is scrolled out of the list.
+pub fn selected_offer(img: &RgbImage, layout: &Layout) -> Option<Rect> {
+    let area = layout.map(OFFER_LIST, 0.0);
+    let (w, h) = (area.w as usize, area.h as usize);
+    let mut mask = vec![false; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let p = img.get_pixel(area.x + x as u32, area.y + y as u32).0;
+            mask[y * w + x] = is_offer_accent(p);
+        }
+    }
+    let scale = layout.scale;
+    // Entries are ~100 px high; the bar spans most of it.
+    let accent = components(&mask, w, h)
+        .into_iter()
+        .filter(|c| f64::from(c.h) >= 40.0 * scale)
+        .max_by_key(|c| c.h)?;
+    let px = |v: f64| (v * scale).round() as u32;
+    let rect = if f64::from(accent.w) >= 200.0 * scale {
+        // The whole border: that is the entry.
+        let m = px(2.0);
+        Rect::new(
+            accent.x.saturating_sub(m),
+            accent.y.saturating_sub(m),
+            accent.w + 2 * m,
+            accent.h + 2 * m,
+        )
+    } else {
+        // The bar alone: the entry reaches the list's right edge and a little above and
+        // below the bar (less than the gap to the next entry).
+        let (m, pad) = (px(4.0), px(14.0));
+        let x = accent.x.saturating_sub(m);
+        let y = accent.y.saturating_sub(pad);
+        Rect::new(x, y, area.w - x, accent.h + 2 * pad)
+    };
+    let rect = rect.clamp(area.w, area.h)?;
+    Some(Rect::new(area.x + rect.x, area.y + rect.y, rect.w, rect.h))
+}
+
 /// 8-connected components of `mask`, as bounding boxes.
 pub(crate) fn components(mask: &[bool], w: usize, h: usize) -> Vec<Rect> {
     let mut seen = vec![false; mask.len()];
@@ -388,6 +455,41 @@ mod tests {
             Some(Rect::new(5, 5, 3, 10))
         );
         assert_eq!(Rect::new(50, 5, 10, 10).clamp(8, 100), None);
+    }
+
+    #[test]
+    fn finds_the_selected_offer() {
+        let mut img = RgbImage::from_pixel(1920, 1080, image::Rgb([20, 25, 35]));
+        let layout = Layout::fixed(1920, 1080);
+        assert_eq!(selected_offer(&img, &layout), None);
+        // Green accent bar of a verified offer, 4 px wide, 72 px high.
+        for y in 465..537 {
+            for x in 190..194 {
+                img.put_pixel(x, y, image::Rgb([60, 230, 140]));
+            }
+        }
+        // A short green speck elsewhere is not an entry.
+        for y in 700..710 {
+            img.put_pixel(300, y, image::Rgb([60, 230, 140]));
+        }
+        // From the bar to the list's right edge, a little above and below the bar.
+        assert_eq!(
+            selected_offer(&img, &layout),
+            Some(Rect::new(186, 451, 612 - 186, 72 + 28))
+        );
+        // A red border all around (unverified offer): the border is the entry.
+        let mut img = RgbImage::from_pixel(1920, 1080, image::Rgb([20, 25, 35]));
+        for x in 190..600 {
+            img.put_pixel(x, 340, image::Rgb([220, 60, 70]));
+            img.put_pixel(x, 457, image::Rgb([220, 60, 70]));
+        }
+        for y in 340..458 {
+            img.put_pixel(190, y, image::Rgb([220, 60, 70]));
+        }
+        assert_eq!(
+            selected_offer(&img, &layout),
+            Some(Rect::new(188, 338, 414, 122))
+        );
     }
 
     #[test]

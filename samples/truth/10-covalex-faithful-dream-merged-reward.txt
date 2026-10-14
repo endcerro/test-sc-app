@@ -1,0 +1,8 @@
+#HAULING v1
+
+CONTRACT: Junior | DIRECT Medium Haul | HUR-L2 Faithful Dream Station > Port Tressler [BP]*
+REWARD: 55,250 aUEC
+CONTRACTOR: Covalex Independent Contractors
+AVAILABILITY: 1h 56m
+MAXBOX: 8
+CARGO: 99 SCU | Quartz | HUR-L2 Faithful Dream Station | Port Tressler above microTech

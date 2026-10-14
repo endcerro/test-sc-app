@@ -20,6 +20,9 @@ pub struct RegionText {
     /// segmented them (one crop per bullet). Entries that don't start with
     /// `Deliver`/`Collect` continue the previous one.
     pub objectives: Vec<String>,
+    /// The highlighted entry of the offer list: title, rounded reward, availability,
+    /// contractor. Fallback for the reward box, see [`offer_entry`].
+    pub offer: Option<String>,
 }
 
 /// One bullet of the Primary Objectives list.
@@ -66,13 +69,18 @@ pub fn contract(regions: &RegionText) -> HaulingContract {
 
 /// Parses several screenshots of the same contract (the objective list scrolled between
 /// them). Scalar fields come from the first shot that has them; objective lists are merged
-/// by overlap, see [`merge::merge_items`].
+/// by overlap, see [`merge::merge_items`]. The reward box is checked against the offer list
+/// entry, see [`with_offer`].
 pub fn contract_from_shots(shots: &[RegionText]) -> HaulingContract {
     let first = |f: fn(&RegionText) -> Option<&String>| shots.iter().find_map(f).cloned();
     let title = first(|r| r.title.as_ref()).and_then(|t| title_text(&t));
-    let (reward, availability, contractor) = first(|r| r.reward.as_ref())
+    let boxed = first(|r| r.reward.as_ref())
         .map(|t| reward_box(&t))
         .unwrap_or_default();
+    let offer = first(|r| r.offer.as_ref())
+        .map(|t| offer_entry(&t))
+        .filter(|o| same_title(title.as_deref(), o.title.as_deref()));
+    let (reward, availability, contractor) = with_offer(boxed, offer.as_ref());
     let details = first(|r| r.details.as_ref()).unwrap_or_default();
     let info = details_info(&details);
     let lists: Vec<Vec<ObjectiveItem>> = shots
@@ -158,6 +166,156 @@ pub fn reward_box(text: &str) -> (Option<u64>, Option<String>, Option<String>) {
             contractor = Some(line);
         }
     }
+    (reward, availability, contractor)
+}
+
+/// What the highlighted entry of the offer list shows:
+///
+/// ```text
+/// JUNIOR | DIRECT MEDIUM HAUL | HUR-           55k
+/// L2 FAITHFUL DREAM STATION -> PORT         1h 56m
+/// TRESSLER [BP]*
+/// COVALEX INDEPENDENT CONTRACTORS
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OfferEntry {
+    /// Title lines joined (upper case on screen).
+    pub title: Option<String>,
+    /// Reward as shown, rounded: `55k` -> 55,000.
+    pub reward: Option<u64>,
+    /// What `reward` is rounded to: 1,000 for `55k`, 100,000 for `1.2M`.
+    pub reward_step: u64,
+    /// Countdown (`1h 56m`); the list shows none for `N/A`.
+    pub availability: Option<String>,
+    /// The bottom line, title-cased: `Covalex Independent Contractors`.
+    pub contractor: Option<String>,
+}
+
+/// Parses the text of the highlighted offer list entry (lines in reading order; the
+/// reward and countdown, right-aligned, can come anywhere among the title lines).
+pub fn offer_entry(text: &str) -> OfferEntry {
+    static AMOUNT: OnceLock<Regex> = OnceLock::new();
+    static NA: OnceLock<Regex> = OnceLock::new();
+    static TIME: OnceLock<Regex> = OnceLock::new();
+    // `M` upper case only: `56m` is a countdown.
+    let amount = re(
+        &AMOUNT,
+        r"(?:^|\s)([\dOolI]{1,4})(?:[.,]([\dOolI]{1,2}))?\s*([kK]|M)$",
+    );
+    let na = re(&NA, r"(?i)^N\s*[/I|l1]\s*[A4]$");
+    let time = re(&TIME, r"\b([\dOolI]{1,3})\s*([hms])\b");
+
+    let mut out = OfferEntry::default();
+    let mut texts: Vec<String> = Vec::new();
+    for raw in text.lines() {
+        let mut line = clean_text(raw);
+        if out.availability.is_none() {
+            if na.is_match(&line) {
+                out.availability = Some("N/A".to_owned());
+                continue;
+            }
+            let rest = time.replace_all(&line, "");
+            if rest.trim().is_empty() && !line.is_empty() {
+                let parts: Vec<String> = time
+                    .captures_iter(&line)
+                    .filter_map(|c| Some(format!("{}{}", repair::number(&c[1])?, &c[2])))
+                    .collect();
+                out.availability = Some(parts.join(" "));
+                continue;
+            }
+        }
+        if out.reward.is_none()
+            && let Some(c) = amount.captures(&line)
+            && let Some(whole) = repair::number(&c[1])
+        {
+            let decimals = c.get(2).map_or("", |m| m.as_str());
+            let fraction = repair::number(decimals).unwrap_or(0);
+            let unit: u64 = if &c[3] == "M" { 1_000_000 } else { 1_000 };
+            let step = unit / 10u64.pow(decimals.len() as u32);
+            out.reward = Some(whole * unit + fraction * step);
+            out.reward_step = step;
+            let start = c.get(0).map_or(line.len(), |m| m.start());
+            line.truncate(start);
+        }
+        if !line.trim().is_empty() {
+            texts.push(line.trim().to_owned());
+        }
+    }
+    // The contractor is the last line, under the title; it has no title punctuation.
+    let is_contractor = |l: &str| {
+        l.chars().filter(|c| c.is_alphabetic()).count() >= 3
+            && !l.contains(['[', ']', '|', '>', '\u{2192}'])
+    };
+    if texts.len() >= 2 && texts.last().is_some_and(|l| is_contractor(l)) {
+        out.contractor = texts.pop().map(|l| title_case(&l));
+    }
+    if !texts.is_empty() {
+        out.title = Some(texts.join(" "));
+    }
+    out
+}
+
+/// `COVALEX INDEPENDENT CONTRACTORS` -> `Covalex Independent Contractors`.
+fn title_case(s: &str) -> String {
+    s.split(' ')
+        .map(|w| {
+            let mut chars = w.chars();
+            match chars.next() {
+                Some(first) => first
+                    .to_uppercase()
+                    .chain(chars.flat_map(char::to_lowercase))
+                    .collect(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Whether the offer list entry is the contract of the details panel (titles alike).
+/// Unknown titles don't veto.
+fn same_title(panel: Option<&str>, offer: Option<&str>) -> bool {
+    let (Some(panel), Some(offer)) = (panel, offer) else {
+        return true;
+    };
+    let (panel, offer) = (normalize(panel), normalize(offer));
+    panel.contains(&offer)
+        || offer.contains(&panel)
+        || strsim::normalized_levenshtein(&panel, &offer) >= 0.6
+}
+
+/// The reward box values (reward, availability, contractor), checked against the offer
+/// list entry. The game sometimes draws the reward box with its lines on top of each other:
+/// the reward is then lost or misread and the contractor garbled (`Covalex Independent
+/// Contrect9Ea`). The list's values are used then: a reward the list disagrees with (beyond
+/// its rounding) or missing, and the contractor of a box that looks broken.
+pub fn with_offer(
+    boxed: (Option<u64>, Option<String>, Option<String>),
+    offer: Option<&OfferEntry>,
+) -> (Option<u64>, Option<String>, Option<String>) {
+    let Some(o) = offer else {
+        return boxed;
+    };
+    let (reward, availability, contractor) = boxed;
+    let agrees = |r: u64| o.reward.is_none_or(|l| r.abs_diff(l) < o.reward_step);
+    let reward_ok = reward.is_some_and(agrees);
+    let broken = !reward_ok
+        || contractor
+            .as_deref()
+            .is_some_and(|c| c.chars().any(|ch| ch.is_ascii_digit()));
+    let reward = if reward_ok {
+        reward
+    } else {
+        o.reward.or(reward)
+    };
+    let contractor = match (contractor, &o.contractor) {
+        (Some(c), Some(listed)) if broken && normalize(&c) != normalize(listed) => {
+            Some(listed.clone())
+        }
+        (None, listed) => listed.clone(),
+        (c, _) => c,
+    };
+    let availability = availability.or_else(|| o.availability.clone());
     (reward, availability, contractor)
 }
 
@@ -453,6 +611,88 @@ mod tests {
         assert_eq!(r, Some(49_750));
         assert_eq!(a.as_deref(), Some("2h 1m"));
         assert_eq!(c.as_deref(), Some("Covalex Independent Contractors"));
+    }
+
+    #[test]
+    fn offer_entry_values() {
+        let o = offer_entry(
+            "JUNIOR | DIRECT MEDIUM HAUL | HUR-\n55k\nL2 FAITHFUL DREAM STATION → PORT\n\
+             1h 56m\nTRESSLER [BP]*\nCOVALEX INDEPENDENT CONTRACTORS",
+        );
+        assert_eq!(o.reward, Some(55_000));
+        assert_eq!(o.reward_step, 1_000);
+        assert_eq!(o.availability.as_deref(), Some("1h 56m"));
+        assert_eq!(
+            o.contractor.as_deref(),
+            Some("Covalex Independent Contractors")
+        );
+        assert_eq!(
+            o.title.as_deref(),
+            Some(
+                "JUNIOR | DIRECT MEDIUM HAUL | HUR- L2 FAITHFUL DREAM STATION → PORT TRESSLER [BP]*"
+            )
+        );
+        // No countdown for N/A contracts; the reward can share a title line.
+        let o = offer_entry(
+            "DEAD SAINTS - ROOKIE |\nRIKER MEMORIAL SPACEPORT [100 535k\nREP]\nDEAD SAINTS",
+        );
+        assert_eq!(o.reward, Some(535_000));
+        assert_eq!(o.availability, None);
+        assert_eq!(o.contractor.as_deref(), Some("Dead Saints"));
+        let o = offer_entry("SOME HAUL [BP]*\n1.2M\n59m 17s\nRED WIND LINEHAUL");
+        assert_eq!((o.reward, o.reward_step), (Some(1_200_000), 100_000));
+        assert_eq!(o.availability.as_deref(), Some("59m 17s"));
+        // A title alone: no contractor.
+        assert_eq!(offer_entry("TRESSLER [BP]*").contractor, None);
+    }
+
+    #[test]
+    fn garbled_reward_box_falls_back_to_the_offer_list() {
+        let offer = "JUNIOR | DIRECT MEDIUM HAUL | HUR-\n55k\nL2 FAITHFUL DREAM STATION → PORT\n\
+             1h 56m\nTRESSLER [BP]*\nCOVALEX INDEPENDENT CONTRACTORS";
+        let shot = |reward: &str| {
+            RegionText {
+            title: Some("Junior | DIRECT Medium Haul | HUR-L2 Faithful\nDream Station > Port Tressler [BP]*".into()),
+            reward: Some(reward.into()),
+            offer: Some(offer.into()),
+            ..RegionText::default()
+        }
+        };
+        // Reward drawn over the contractor: lost, and the contractor garbled.
+        let c = contract(&shot("1h 56m\nCovalex Independent Contrect9Ea"));
+        assert_eq!(c.reward, Some(55_000));
+        assert_eq!(c.availability.as_deref(), Some("1h 56m"));
+        assert_eq!(
+            c.contractor.as_deref(),
+            Some("Covalex Independent Contractors")
+        );
+        // Part of the amount read: the list disagrees, it wins.
+        let c = contract(&shot("¤ 5,250\n1h 56m\nCovalex Independent Contractors"));
+        assert_eq!(c.reward, Some(55_000));
+        assert_eq!(
+            c.contractor.as_deref(),
+            Some("Covalex Independent Contractors")
+        );
+        // A good box is kept: exact amount, contractor as written.
+        let c = contract(&shot("¤ 55,250\n1h 56m\nCovalex Independent Contractors"));
+        assert_eq!(c.reward, Some(55_250));
+        // The list of another contract is ignored.
+        let other = RegionText {
+            title: Some("Rookie | Small Haul | from Baijini Point [BP]*".into()),
+            ..shot("1h 56m\nCovalex")
+        };
+        assert_eq!(contract(&other).reward, None);
+        // Without the list, the box as read.
+        let alone = RegionText {
+            offer: None,
+            ..shot("1h 56m\nCovalex Independent Contrect9Ea")
+        };
+        let c = contract(&alone);
+        assert_eq!(c.reward, None);
+        assert_eq!(
+            c.contractor.as_deref(),
+            Some("Covalex Independent Contrect9Ea")
+        );
     }
 
     #[test]

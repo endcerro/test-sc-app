@@ -44,6 +44,7 @@ pub struct ShotBoxes {
     pub reward: Vec<Option<LineBox>>,
     pub details: Vec<Option<LineBox>>,
     pub objectives: Vec<Option<LineBox>>,
+    pub offer: Vec<Option<LineBox>>,
 }
 
 /// Raw OCR text of one screenshot, kept so a contract can be re-parsed (parser changes,
@@ -57,6 +58,9 @@ pub struct ShotText {
     pub reward: String,
     pub details: String,
     pub objectives: String,
+    /// The highlighted entry of the offer list (fallback for the reward box); empty in
+    /// shots read before it was.
+    pub offer: String,
     pub boxes: ShotBoxes,
 }
 
@@ -83,11 +87,13 @@ impl ShotText {
             reward: text_of(&screen.reward),
             details: text_of(&screen.details),
             objectives: text_of(&screen.objectives),
+            offer: text_of(&screen.offer),
             boxes: ShotBoxes {
                 title: boxes(&screen.title),
                 reward: boxes(&screen.reward),
                 details: boxes(&screen.details),
                 objectives: boxes(&screen.objectives),
+                offer: boxes(&screen.offer),
             },
         }
     }
@@ -101,6 +107,7 @@ impl ShotText {
             reward: some(&self.reward),
             details: some(&self.details),
             objectives: self.objectives.lines().map(str::to_owned).collect(),
+            offer: some(&self.offer),
         }
     }
 
@@ -111,6 +118,7 @@ impl ShotText {
             Region::Reward => (&self.reward, &self.boxes.reward),
             Region::Details => (&self.details, &self.boxes.details),
             Region::Objectives => (&self.objectives, &self.boxes.objectives),
+            Region::Offer => (&self.offer, &self.boxes.offer),
         };
         text.lines()
             .enumerate()

@@ -24,6 +24,7 @@ fn regions(stem: &str) -> RegionText {
             .lines()
             .map(str::to_owned)
             .collect(),
+        offer: read(&dir.join("offer.txt")),
     }
 }
 
@@ -56,9 +57,26 @@ fn single_shots_parse_to_truth() {
         "07-covalex-lyria-multipickup",
         "08-covalex-baijini-riker",
         "09-redwind-yela-scroll-1",
+        "10-covalex-faithful-dream-merged-reward",
     ] {
         check(stem, &[regions(stem)]);
     }
+}
+
+/// Sample 10: the game drew the reward over the contractor. PaddleOCR reads no reward and
+/// a garbled contractor there; the offer list supplies both (the reward rounded).
+#[test]
+fn garbled_reward_box_uses_the_offer_list() {
+    let stem = "10-covalex-faithful-dream-merged-reward";
+    let shot = RegionText {
+        reward: Some("1h 56m\nCovalex Independent Contrect9Ea".into()),
+        ..regions(stem)
+    };
+    let mut pred = parse::contract(&shot);
+    assert_eq!(pred.reward, Some(55_000));
+    pred.reward = Some(55_250);
+    let s = score(&pred, &truth_for(stem));
+    assert!(s.is_perfect(), "{}", sc_contracts::score::report(&s));
 }
 
 #[test]

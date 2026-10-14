@@ -263,7 +263,7 @@ impl ContractsPane {
         };
         for outcome in worker.poll() {
             match outcome {
-                Outcome::Read(shot) => self.on_shot(shot),
+                Outcome::Read(shot) => self.on_shot(*shot),
                 Outcome::Failed { path, error } => {
                     self.status = (
                         format!("Can't read {}: {error}", file_name(&path)),

@@ -4,7 +4,7 @@
 //! point to the right place after a merge of scrolled shots, and edits that move lines.
 
 use sc_contracts::ObjectiveItem;
-use sc_contracts::parse::objective_segments;
+use sc_contracts::parse::{objective_segments, offer_entry};
 use sc_ocr::Region;
 use sc_universe::normalize;
 use strsim::normalized_levenshtein;
@@ -17,6 +17,9 @@ use super::{Entry, LineBox};
 pub struct Source {
     /// Index into `Entry::shots`.
     pub shot: usize,
+    /// Region the value was read in: [`Region::Offer`] when the reward box was unreadable
+    /// and the offer list supplied it.
+    pub region: Region,
     pub x: u32,
     pub y: u32,
     pub w: u32,
@@ -28,6 +31,10 @@ pub struct Source {
 /// Lowest similarity accepted when finding a value back in the text.
 const MIN_SCORE: f64 = 0.6;
 
+/// The reward box, then the offer list entry that stands in for it when the game draws the
+/// box garbled; on equal scores the box wins.
+const BOX_THEN_LIST: &[Region] = &[Region::Reward, Region::Offer];
+
 /// Where field `f` was read, if it came from a screenshot.
 pub fn locate(entry: &Entry, f: Field) -> Option<Source> {
     let c = &entry.contract;
@@ -35,21 +42,26 @@ pub fn locate(entry: &Entry, f: Field) -> Option<Source> {
     match f {
         Field::Title => whole_region(entry, Region::Title),
         Field::Reward => {
-            let digits = c.reward?.to_string();
-            best_line(entry, Region::Reward, |line| {
-                let d: String = line.chars().filter(char::is_ascii_digit).collect();
-                Some(if d == digits { 1.0 } else { 0.0 })
+            let reward = c.reward?;
+            let digits = reward.to_string();
+            best_line(entry, BOX_THEN_LIST, |region, line| {
+                let found = match region {
+                    // `55k`: rounded, so only an exact match of the parsed amount counts.
+                    Region::Offer => offer_entry(line).reward == Some(reward),
+                    _ => line.chars().filter(char::is_ascii_digit).eq(digits.chars()),
+                };
+                Some(if found { 1.0 } else { 0.0 })
             })
         }
-        Field::Contractor => best_line(entry, Region::Reward, |l| {
+        Field::Contractor => best_line(entry, BOX_THEN_LIST, |_, l| {
             similar(l, c.contractor.as_deref()?)
         }),
-        Field::Availability => best_line(entry, Region::Reward, |l| {
+        Field::Availability => best_line(entry, BOX_THEN_LIST, |_, l| {
             similar(l, c.availability.as_deref()?)
         }),
         Field::MaxBox => {
             let want = format!("{} scu", c.max_box?);
-            best_line(entry, Region::Details, |l| {
+            best_line(entry, &[Region::Details], |_, l| {
                 Some(if normalize(l).contains(&want) {
                     1.0
                 } else {
@@ -59,7 +71,7 @@ pub fn locate(entry: &Entry, f: Field) -> Option<Source> {
         }
         Field::Rep => {
             let want = c.rep?.to_string();
-            best_line(entry, Region::Details, |l| {
+            best_line(entry, &[Region::Details], |_, l| {
                 let n = normalize(l);
                 Some(match (n.contains("reputation"), n.contains(&want)) {
                     (_, false) => 0.0,
@@ -135,20 +147,27 @@ fn deliver_score(item: &ObjectiveItem, commodity: &str, drop: Option<(&str, u32)
 fn whole_region(entry: &Entry, region: Region) -> Option<Source> {
     entry.shots.iter().enumerate().find_map(|(shot, s)| {
         let boxes: Vec<LineBox> = s.lines(region).into_iter().filter_map(|l| l.1).collect();
-        union(shot, &boxes)
+        union(shot, region, &boxes)
     })
 }
 
-/// The best scoring line of a region, over all shots.
-fn best_line(entry: &Entry, region: Region, score: impl Fn(&str) -> Option<f64>) -> Option<Source> {
+/// The best scoring line of some regions, over all shots; on equal scores the earlier
+/// region wins.
+fn best_line(
+    entry: &Entry,
+    regions: &[Region],
+    score: impl Fn(Region, &str) -> Option<f64>,
+) -> Option<Source> {
     let mut best: Option<(f64, Source)> = None;
-    for (shot, s) in entry.shots.iter().enumerate() {
-        for (text, b) in s.lines(region) {
-            let (Some(b), Some(sc)) = (b, score(text)) else {
-                continue;
-            };
-            if sc >= MIN_SCORE && best.is_none_or(|(have, _)| sc > have) {
-                best = union(shot, &[b]).map(|src| (sc, src));
+    for &region in regions {
+        for (shot, s) in entry.shots.iter().enumerate() {
+            for (text, b) in s.lines(region) {
+                let (Some(b), Some(sc)) = (b, score(region, text)) else {
+                    continue;
+                };
+                if sc >= MIN_SCORE && best.is_none_or(|(have, _)| sc > have) {
+                    best = union(shot, region, &[b]).map(|src| (sc, src));
+                }
             }
         }
     }
@@ -167,7 +186,7 @@ fn best_item(entry: &Entry, score: impl Fn(&ObjectiveItem) -> Option<f64>) -> Op
             };
             let boxes: Vec<LineBox> = lines[range].iter().filter_map(|l| l.1).collect();
             if best.is_none_or(|(have, _)| sc > have)
-                && let Some(src) = union(shot, &boxes)
+                && let Some(src) = union(shot, Region::Objectives, &boxes)
             {
                 best = Some((sc, src));
             }
@@ -176,7 +195,7 @@ fn best_item(entry: &Entry, score: impl Fn(&ObjectiveItem) -> Option<f64>) -> Op
     best.map(|(_, s)| s)
 }
 
-fn union(shot: usize, boxes: &[LineBox]) -> Option<Source> {
+fn union(shot: usize, region: Region, boxes: &[LineBox]) -> Option<Source> {
     let x0 = boxes.iter().map(|b| b.x).min()?;
     let y0 = boxes.iter().map(|b| b.y).min()?;
     let x1 = boxes.iter().map(|b| b.x + b.w).max()?;
@@ -184,6 +203,7 @@ fn union(shot: usize, boxes: &[LineBox]) -> Option<Source> {
     let conf = boxes.iter().filter_map(|b| b.conf).min_by(f32::total_cmp);
     Some(Source {
         shot,
+        region,
         x: x0,
         y: y0,
         w: x1 - x0,
@@ -231,6 +251,7 @@ mod tests {
                     b(130, 0.99),
                     b(140, 0.9),
                 ],
+                ..ShotBoxes::default()
             },
             ..ShotText::default()
         };

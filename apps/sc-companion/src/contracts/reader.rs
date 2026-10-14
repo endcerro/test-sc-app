@@ -11,7 +11,8 @@ use super::ShotText;
 pub const NO_OCR: &str =
     "This build has no OCR. Rebuild with `cargo run -p sc-companion --features ocr`.";
 
-/// Session pool size given to the engine: one per region read concurrently.
+/// Session pool size given to the engine: one per region read concurrently (the small
+/// offer list crop takes the first one free).
 #[cfg(feature = "ocr")]
 const ENGINE_THREADS: usize = 4;
 

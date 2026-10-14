@@ -390,7 +390,10 @@ fn read_contracts(
 
 /// Each region's lines with their engine confidence and box.
 fn print_raw(shot: &contracts::ShotText) {
-    for region in sc_ocr::Region::ALL {
+    for region in sc_ocr::Region::ALL
+        .into_iter()
+        .chain([sc_ocr::Region::Offer])
+    {
         println!("--- {}", region.name());
         for (text, b) in shot.lines(region) {
             match b {

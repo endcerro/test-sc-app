@@ -650,6 +650,7 @@ mod tests {
             reward: read("reward"),
             details: read("details"),
             objectives: read("objectives"),
+            offer: read("offer"),
             ..ShotText::default()
         }
     }

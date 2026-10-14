@@ -158,6 +158,8 @@ pub fn region_text(scored: &Scored, shot: usize, choice: &Choice) -> RegionText 
         objectives: get(Region::Objectives)
             .map(|t| t.lines().map(str::to_owned).collect())
             .unwrap_or_default(),
+        // The benchmark reads the fixed regions only.
+        offer: None,
     }
 }
 

@@ -3,9 +3,11 @@
 //! places, the fields left to check in reading order, and duplicate contracts.
 //!
 //! A doubtful read is an inferred place (`?`), a name snapping changed, an ambiguous place,
-//! or a value read from an OCR line the engine was not sure of. Typing a value, or pressing
+//! a value read from an OCR line the engine was not sure of, or a reward taken from the
+//! offer list (rounded) because the reward box was garbled. Typing a value, or pressing
 //! Enter on it, confirms it.
 
+use sc_ocr::Region;
 use sc_universe::{Universe, normalize};
 
 use super::fields::{self, Field};
@@ -108,10 +110,12 @@ pub fn mark(e: &Entry, f: Field, lk: Lookup) -> Mark {
             .iter()
             .any(|r| r.kind == ReadKind::Place && r.known == text);
     let ambiguous = f.is_place() && matches!(tree(), PlaceTree::Ambiguous(_));
-    let low = sources::locate(e, f)
+    let source = sources::locate(e, f);
+    let low = source
         .and_then(|s| s.conf)
         .is_some_and(|c| c < LOW_CONFIDENCE);
-    if inferred || snapped || ambiguous || low {
+    let rounded = matches!(f, Field::Reward) && source.is_some_and(|s| s.region == Region::Offer);
+    if inferred || snapped || ambiguous || low || rounded {
         Mark::Unsure
     } else {
         Mark::None
@@ -151,7 +155,17 @@ pub fn review(e: &Entry, lk: Lookup) -> Review {
             }
         }
     }
+    let rounded = !confirmed(e, Field::Reward)
+        && sources::locate(e, Field::Reward).is_some_and(|s| s.region == Region::Offer);
+    if rounded {
+        r.notes.push(
+            "reward read from the offer list, rounded (the reward box was unreadable)".to_owned(),
+        );
+    }
     for f in fields::all(c) {
+        if rounded && matches!(f, Field::Reward) {
+            continue;
+        }
         if mark(e, f, lk) == Mark::Unsure {
             let what = if f.is_place() {
                 format!("{} {}", fields::text(c, f), f.label())
@@ -338,6 +352,58 @@ mod tests {
             review(&e, lk).notes,
             ["Gold cargo, read \u{201c}Gald\u{201d}"]
         );
+    }
+
+    #[test]
+    fn reward_from_the_offer_list_is_doubtful() {
+        let u = empty();
+        let places = Places::new(&u, &BTreeMap::new());
+        let lk = Lookup {
+            universe: &u,
+            places: &places,
+        };
+        let line = |y| {
+            Some(LineBox {
+                x: 0,
+                y,
+                w: 10,
+                h: 10,
+                conf: Some(0.99),
+            })
+        };
+        let mut e = entry(Place::new("A"), "B", 4);
+        e.contract.reward = Some(55_000);
+        e.shots = vec![ShotText {
+            reward: "1h 56m\nCovalex Independent Contrect9Ea".into(),
+            offer: "JUNIOR | HAUL\n55k\n1h 56m\nCOVALEX INDEPENDENT CONTRACTORS".into(),
+            boxes: ShotBoxes {
+                reward: vec![line(0), line(10)],
+                offer: vec![line(100), line(110), line(120), line(130)],
+                ..ShotBoxes::default()
+            },
+            ..ShotText::default()
+        }];
+        let src = sources::locate(&e, Field::Reward);
+        assert_eq!(src.map(|s| (s.region, s.y)), Some((Region::Offer, 110)));
+        assert_eq!(mark(&e, Field::Reward, lk), Mark::Unsure);
+        let r = review(&e, lk);
+        assert!(r.unsure.is_empty(), "{:?}", r.unsure);
+        assert_eq!(
+            r.notes,
+            ["reward read from the offer list, rounded (the reward box was unreadable)"]
+        );
+        e.confirmed
+            .push(("reward".into(), fields::text(&e.contract, Field::Reward)));
+        assert_eq!(mark(&e, Field::Reward, lk), Mark::None);
+        assert!(review(&e, lk).notes.is_empty());
+
+        // An exact reward read in the box points there, even when the list agrees.
+        e.confirmed.clear();
+        e.contract.reward = Some(55_250);
+        e.shots[0].reward = "¤ 55,250\n1h 56m".into();
+        let src = sources::locate(&e, Field::Reward);
+        assert_eq!(src.map(|s| (s.region, s.y)), Some((Region::Reward, 0)));
+        assert_eq!(mark(&e, Field::Reward, lk), Mark::None);
     }
 
     #[test]

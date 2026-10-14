@@ -243,6 +243,18 @@ cargo run -p sc-companion --release --features ocr -- contract samples/03-redwin
   the benchmark uses (`sc_ocr::models::default_dir`), checked against their pinned sha256.
 - The four regions are read concurrently (4 sessions per model): about 1.5-2 s per 1080p
   screenshot on a Ryzen 7 9800X3D, plus ~0.5 s to load the engine on the first one.
+- **Offer list fallback.** The game sometimes draws the reward box with its lines on top of
+  each other (sample 10: the amount over `Contracted By`): the reward is lost and the
+  contractor garbled (`Covalex Independent Contrect9Ea`). The highlighted entry of the offer
+  list on the left shows the same contract with its reward rounded (`55k`), countdown and
+  contractor (upper case), so it is read too (`Region::Offer`): `layout::selected_offer`
+  finds it by its accent (bright green bar for verified offers, red border for unverified
+  ones; the fill varies from green to teal), on all 11 samples. `parse::with_offer` keeps
+  the box when its reward agrees with the list (within the rounding) and otherwise takes
+  the list's reward, and the list's contractor when the box looks broken (reward missing or
+  disagreeing, digits in the contractor). The list entry is ignored when its title is not
+  the panel's. A reward from the list is flagged as a doubtful read ("rounded") until the
+  player types or confirms it. The benchmark does not read the list.
 - Every dropped file is read on a background thread, one at a time, then parsed into
   flows (`sc_contracts::Contract`, see `docs/architecture.md`) and saved in
   `<data dir>/sc-companion/contracts` (override with `--contracts-dir`) as `<id>.json`: the
@@ -281,6 +293,7 @@ cargo run -p sc-companion --release --features ocr -- contract samples/03-redwin
 
 Drop `NN-name.webp|png` in `samples/`, write `truth/NN-name.txt` (`#HAULING v1`) and, for
 CER, `truth/regions/NN-name/{title,reward,details,objectives}.txt` (use
-`ocr-bench dump --sample NN` to get the crops). Scrolled shots are `NN-name-1`, `NN-name-2`
+`ocr-bench dump --sample NN` to get the crops); an optional `offer.txt` (the highlighted
+list entry) is used by the parser tests only. Scrolled shots are `NN-name-1`, `NN-name-2`
 with the merged truth in `truth/NN-name.txt`. Then re-run the benchmark: only the new
 images are OCR'd.
