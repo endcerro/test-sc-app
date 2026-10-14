@@ -27,12 +27,13 @@ file schemas, quirks) before changing the data layer, and `docs/ocr.md` before c
 | `crates/sc-data/data/aliases.json` | Hand-maintained aliases (embedded), keyed by starmap UUID. |
 | `crates/sc-data/tests/fixtures/scunpacked` | Trimmed real scunpacked files (game 4.10.2) used by offline tests. |
 | `crates/sc-contracts` | Pure: `HaulingContract` model (screen: one line per Deliver objective), `Contract` (flows: 1 pickup -> N drop-offs or N pickups -> 1 drop-off; `from_objectives`/`to_objectives`), `#HAULING v1` truth format (`truth`), OCR text -> contract (`parse`, `repair`), scrolled-shot merge (`merge`), name snapping and place resolution (`snap`, embedded `data/commodities.json`), scoring (`score`). **No IO.** |
-| `crates/sc-ocr` | Pixels -> text. `layout` (regions in a 1920x1080 reference frame, OFFERS-tab anchor, yellow bullet detection), `preprocess` (`Pipeline`: colour mask, top-hat, binarise, scale, despeckle, invert), `engine` (`OcrEngine` trait; `paddle`, `ocrs`, `winocr`, `tesseract` adapters behind features), `screen` (whole screenshot with the recommended settings), `models` (pinned model URLs + sha256; `fetch` behind the `download` feature). |
+| `crates/sc-ocr` | Pixels -> text. `layout` (regions in a 1920x1080 reference frame, OFFERS-tab anchor, yellow bullet detection), `preprocess` (`Pipeline`: colour mask, top-hat, binarise, scale, despeckle, invert), `engine` (`OcrEngine` trait; `paddle`, `ocrs`, `winocr`, `tesseract` adapters behind features), `screen` (whole screenshot with the recommended settings; lines keep their screenshot box and confidence), `models` (pinned model URLs + sha256; `fetch` behind the `download` feature). |
 | `tools/ocr-bench` | OCR benchmark: grid over engines x pipelines x crop modes, result cache, CER + end-to-end scoring, `summary.md` reports. Engines are opt-in features. |
 | `samples/` | Contract screenshots, `truth/<stem>.txt` (`#HAULING v1`), `truth/regions/<stem>/<region>.txt` (exact region text). |
 | `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`, `contract`). OCR behind the `ocr` feature (off by default). |
-| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText` with Paddle, models fetched on first use), `parse` (flows + snapping corrections), `checks` (what to double-check), `store` (saved list: `<id>.json` with flows, edits, loaded flags and raw OCR text; shots of the same contract merge; old `.txt` stores converted). |
-| `apps/sc-companion/src/gui/contracts` | Contracts pane (temporary view): drop box (drag & drop or file dialog), background OCR `worker`, editable `card` per contract (`draft` = fields as typed text), capture preview, re-parse. |
+| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText`: text + line boxes, Paddle, models fetched on first use), `parse` (flows + snapping corrections), `fields` (`Field`: text/set of every editable value), `sources` (screenshot box a value was read from), `places` (place tree, suggestions, fixes, taught names), `review` (field marks, problems, next to check, duplicates), `board_text` (`#HAULING v1` import/export), `store` (`<id>.json` per contract + `place_names.json`; shots of the same contract merge; old `.txt` stores converted). |
+| `apps/sc-companion/src/gui/contracts` | Contracts pane (temporary view, ported from the hauling planner's board): drop box + paste/export box, background OCR `worker`, `card` per contract (`widgets`: buffered fields, marks, place autocomplete), source crops, Next to check (F8). |
+| `apps/sc-companion/src/gui/theme.rs` | App theme (planner palette, Segoe UI + Segoe UI Symbol on Windows; `theme::sym` falls back to plain text without them). |
 | `apps/sc-companion/src/gui/map` | Map pane: `camera` (f64 orthographic 2D/3D projection), `scene` (pure what-to-draw + LOD, tested), `paint`, `style`, `inspector`. |
 
 ## Commands
@@ -71,7 +72,8 @@ CI (`.github/workflows/ci.yml`) runs fmt check, clippy `-D warnings` and tests.
   of the library crates.
 - GUI: keep computation (projection, scene/LOD) separate from painting so it can be unit
   tested; world maths in f64 relative to the camera centre, f32 only once in pixels. Avoid
-  non-Latin-1 symbols in UI strings (egui's default fonts lack e.g. `→`, `✕`).
+  non-Latin-1 symbols in UI strings unless they go through `theme::sym(ctx, fancy, plain)`
+  (egui's default fonts lack e.g. `→`, `✕`; the theme loads Segoe UI Symbol on Windows).
 - Errors: `thiserror` enums in libraries, `anyhow` only in `apps/`.
 - No `unwrap`/`expect` in library code (clippy warns; CI denies warnings). In tests, prefer
   `unwrap_or_else(|e| panic!("{e}"))`.

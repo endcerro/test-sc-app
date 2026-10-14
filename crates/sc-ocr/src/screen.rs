@@ -5,7 +5,7 @@
 use image::RgbImage;
 
 use crate::preprocess::{Background, Binarize, ColorMode};
-use crate::{Layout, OcrEngine, OcrError, Pipeline, Region, crop};
+use crate::{Layout, OcrEngine, OcrError, Pipeline, Rect, Region, crop};
 
 /// Margin around region rectangles, in reference pixels.
 pub const REGION_MARGIN: f64 = 8.0;
@@ -28,16 +28,67 @@ pub fn recommended_pipeline(height: u32) -> Pipeline {
     }
 }
 
-/// Text of each region of one screenshot, lines separated by `\n`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ScreenText {
-    pub title: String,
-    pub reward: String,
-    pub details: String,
-    pub objectives: String,
+/// One line read on the screenshot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScreenLine {
+    pub text: String,
+    /// Where the line is, in screenshot pixels, when the engine reports boxes.
+    pub rect: Option<Rect>,
+    /// Engine confidence in `0.0..=1.0`, when reported.
+    pub confidence: Option<f32>,
 }
 
-/// Reads one region from its crop in `layout`.
+/// The lines of each region of one screenshot, in reading order.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ScreenText {
+    pub title: Vec<ScreenLine>,
+    pub reward: Vec<ScreenLine>,
+    pub details: Vec<ScreenLine>,
+    pub objectives: Vec<ScreenLine>,
+}
+
+/// Lines joined with `\n`.
+pub fn text_of(lines: &[ScreenLine]) -> String {
+    lines
+        .iter()
+        .map(|l| l.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Reads one region from its crop in `layout`; line boxes are mapped back to the
+/// screenshot.
+pub fn read_region_lines(
+    img: &RgbImage,
+    layout: &Layout,
+    pipeline: &Pipeline,
+    engine: &dyn OcrEngine,
+    region: Region,
+) -> Result<Vec<ScreenLine>, OcrError> {
+    let area = layout.rect(region, REGION_MARGIN);
+    let out = engine.recognize(&pipeline.apply(&crop(img, area)))?;
+    Ok(out
+        .lines
+        .into_iter()
+        .map(|l| ScreenLine {
+            rect: l.rect.map(|r| to_screenshot(r, area, pipeline)),
+            text: l.text,
+            confidence: l.confidence,
+        })
+        .collect())
+}
+
+/// Box in the preprocessed crop -> box in the screenshot.
+fn to_screenshot(r: Rect, area: Rect, pipeline: &Pipeline) -> Rect {
+    let (x0, y0) = pipeline.to_source(f64::from(r.x), f64::from(r.y));
+    let (x1, y1) = pipeline.to_source(f64::from(r.right()), f64::from(r.bottom()));
+    let px = |v: f64, max: u32| (v.max(0.0).round() as u32).min(max);
+    let (x0, x1) = (px(x0, area.w), px(x1, area.w));
+    let (y0, y1) = (px(y0, area.h), px(y1, area.h));
+    Rect::new(area.x + x0, area.y + y0, x1 - x0.min(x1), y1 - y0.min(y1))
+}
+
+/// Reads one region's text from its crop in `layout`.
 pub fn read_region(
     img: &RgbImage,
     layout: &Layout,
@@ -57,7 +108,7 @@ pub fn read_contract_screen(
     pipeline: &Pipeline,
 ) -> Result<ScreenText, OcrError> {
     let layout = Layout::anchored(img);
-    let read = |region| read_region(img, &layout, pipeline, engine, region);
+    let read = |region| read_region_lines(img, &layout, pipeline, engine, region);
     let [title, reward, details, objectives] = std::thread::scope(|s| {
         let handles = Region::ALL.map(|region| s.spawn(move || read(region)));
         handles.map(|h| {
@@ -88,6 +139,25 @@ mod tests {
         assert_eq!(
             recommended_pipeline(1080).id(),
             "max/-/x2/-/despeckle/native"
+        );
+    }
+
+    #[test]
+    fn boxes_map_back_to_the_screenshot() {
+        let pipeline = recommended_pipeline(1080);
+        let pad = pipeline.padding();
+        let area = Rect::new(1000, 300, 500, 400);
+        // A line at (10, 20) of the crop, 100x30, is at pad + 2x in the processed image.
+        let processed = Rect::new(pad + 20, pad + 40, 200, 60);
+        assert_eq!(
+            to_screenshot(processed, area, &pipeline),
+            Rect::new(1010, 320, 100, 30)
+        );
+        // Boxes reaching into the padding are clamped to the crop.
+        let edge = Rect::new(0, 0, pad + 2, pad + 2);
+        assert_eq!(
+            to_screenshot(edge, area, &pipeline),
+            Rect::new(1000, 300, 1, 1)
         );
     }
 }

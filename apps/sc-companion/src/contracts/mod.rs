@@ -1,24 +1,51 @@
 //! Hauling contracts read from screenshots: OCR ([`reader`]), parsing into flows
-//! ([`parse`]), what to double-check ([`checks`]) and the saved list ([`store`]).
+//! ([`parse`]), the editable fields of a contract ([`fields`]), where each value was read
+//! ([`sources`]), place lookup ([`places`]), what to double-check ([`review`]), contract
+//! text import/export ([`board_text`]) and the saved list ([`store`]).
 //! Shared by the GUI's Contracts pane and the `contract` CLI command; no egui here.
 
-pub mod checks;
+pub mod board_text;
+pub mod fields;
+pub mod places;
 pub mod reader;
+pub mod review;
+pub mod sources;
 pub mod store;
 
 use std::path::PathBuf;
 
 use sc_contracts::{Contract, Flow, HaulingContract, RegionText};
-use sc_ocr::ScreenText;
+use sc_ocr::{Region, ScreenLine, ScreenText, text_of};
 use sc_universe::Universe;
 use serde::{Deserialize, Serialize};
 
 pub use reader::ContractReader;
 pub use store::{ContractStore, Entry};
 
+/// Where one OCR line is on its screenshot, in pixels, and how sure the engine was.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct LineBox {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conf: Option<f32>,
+}
+
+/// One box per line of each region's text (`None` when the engine gave no box).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ShotBoxes {
+    pub title: Vec<Option<LineBox>>,
+    pub reward: Vec<Option<LineBox>>,
+    pub details: Vec<Option<LineBox>>,
+    pub objectives: Vec<Option<LineBox>>,
+}
+
 /// Raw OCR text of one screenshot, kept so a contract can be re-parsed (parser changes,
-/// scrolled shots merged later).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// scrolled shots merged later), with the box of every line to show a value's pixels.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ShotText {
     /// Screenshot file the text was read from.
@@ -27,17 +54,38 @@ pub struct ShotText {
     pub reward: String,
     pub details: String,
     pub objectives: String,
+    pub boxes: ShotBoxes,
 }
 
 impl ShotText {
     #[cfg_attr(not(feature = "ocr"), allow(dead_code))]
     pub fn from_screen(source: Option<PathBuf>, screen: ScreenText) -> Self {
+        let boxes = |lines: &[ScreenLine]| -> Vec<Option<LineBox>> {
+            lines
+                .iter()
+                .map(|l| {
+                    l.rect.map(|r| LineBox {
+                        x: r.x,
+                        y: r.y,
+                        w: r.w,
+                        h: r.h,
+                        conf: l.confidence,
+                    })
+                })
+                .collect()
+        };
         Self {
             source,
-            title: screen.title,
-            reward: screen.reward,
-            details: screen.details,
-            objectives: screen.objectives,
+            title: text_of(&screen.title),
+            reward: text_of(&screen.reward),
+            details: text_of(&screen.details),
+            objectives: text_of(&screen.objectives),
+            boxes: ShotBoxes {
+                title: boxes(&screen.title),
+                reward: boxes(&screen.reward),
+                details: boxes(&screen.details),
+                objectives: boxes(&screen.objectives),
+            },
         }
     }
 
@@ -52,6 +100,34 @@ impl ShotText {
             objectives: self.objectives.lines().map(str::to_owned).collect(),
         }
     }
+
+    /// The lines of a region, each with its box when known.
+    pub fn lines(&self, region: Region) -> Vec<(&str, Option<LineBox>)> {
+        let (text, boxes) = match region {
+            Region::Title => (&self.title, &self.boxes.title),
+            Region::Reward => (&self.reward, &self.boxes.reward),
+            Region::Details => (&self.details, &self.boxes.details),
+            Region::Objectives => (&self.objectives, &self.boxes.objectives),
+        };
+        text.lines()
+            .enumerate()
+            .map(|(i, l)| (l, boxes.get(i).copied().flatten()))
+            .collect()
+    }
+}
+
+/// What snapping changed: the name as read and the known name it became.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Read {
+    pub kind: ReadKind,
+    pub read: String,
+    pub known: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadKind {
+    Commodity,
+    Place,
 }
 
 /// A parsed screenshot (or several shots of one contract).
@@ -61,8 +137,8 @@ pub struct Parsed {
     pub objectives: HaulingContract,
     /// The same contract as flows.
     pub contract: Contract,
-    /// Names that snapping changed: OCR reads worth a look (`E'tam commodity, read "Etam"`).
-    pub corrections: Vec<String>,
+    /// Names that snapping changed: OCR reads worth a look.
+    pub reads: Vec<Read>,
 }
 
 /// Parses one or more shots of the same contract, snaps commodity and place names to the
@@ -74,7 +150,7 @@ pub fn parse(shots: &[ShotText], universe: &Universe) -> Parsed {
     sc_contracts::snap::contract(&mut objectives, Some(universe));
     Parsed {
         contract: Contract::from_objectives(&objectives),
-        corrections: corrections(&read, &objectives),
+        reads: snapped_names(&read, &objectives),
         objectives,
     }
 }
@@ -103,21 +179,25 @@ pub fn flow_line(f: &Flow) -> String {
     )
 }
 
-/// One message per name that snapping changed (each name once).
-fn corrections(read: &HaulingContract, snapped: &HaulingContract) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    let mut push = |what: &str, read: &str, known: &str| {
-        let msg = format!("{known} {what}, read \"{read}\"");
-        if read != known && !out.contains(&msg) {
-            out.push(msg);
+/// Every name that snapping changed (each once).
+fn snapped_names(read: &HaulingContract, snapped: &HaulingContract) -> Vec<Read> {
+    let mut out: Vec<Read> = Vec::new();
+    let mut push = |kind, read: &str, known: &str| {
+        let r = Read {
+            kind,
+            read: read.to_owned(),
+            known: known.to_owned(),
+        };
+        if read != known && !out.contains(&r) {
+            out.push(r);
         }
     };
     for (r, s) in read.cargo.iter().zip(&snapped.cargo) {
-        push("commodity", &r.commodity, &s.commodity);
+        push(ReadKind::Commodity, &r.commodity, &s.commodity);
         let read_places = r.pickups.iter().chain(std::iter::once(&r.dropoff));
         let snapped_places = s.pickups.iter().chain(std::iter::once(&s.dropoff));
         for (rp, sp) in read_places.zip(snapped_places) {
-            push("place", &rp.name, &sp.name);
+            push(ReadKind::Place, &rp.name, &sp.name);
         }
     }
     out
@@ -140,6 +220,29 @@ mod tests {
         assert_eq!(r.reward.as_deref(), Some("12,000"));
         assert_eq!(r.details, None);
         assert_eq!(r.objectives.len(), 2);
+    }
+
+    #[test]
+    fn lines_keep_their_boxes() {
+        let b = LineBox {
+            x: 1,
+            y: 2,
+            w: 3,
+            h: 4,
+            conf: Some(0.9),
+        };
+        let shot = ShotText {
+            reward: "12,000\nN/A".into(),
+            boxes: ShotBoxes {
+                reward: vec![Some(b)],
+                ..ShotBoxes::default()
+            },
+            ..ShotText::default()
+        };
+        assert_eq!(
+            shot.lines(Region::Reward),
+            [("12,000", Some(b)), ("N/A", None)]
+        );
     }
 
     #[test]
@@ -168,7 +271,7 @@ mod tests {
         let shot = ShotText {
             title: "Haul".into(),
             reward: "12,000".into(),
-            objectives: "Deliver 0/8 SCU of Hydragen Fuel to Baijini Point.
+            objectives: "Deliver 0/8 SCU of Hydragen Fuel to Baijini Point.\n\
                          Collect Hydragen Fuel from Port Tressler."
                 .into(),
             ..ShotText::default()
@@ -180,8 +283,12 @@ mod tests {
         assert_eq!(parsed.contract.flows.len(), 1);
         assert_eq!(parsed.contract.flows[0].commodity, "Hydrogen Fuel");
         assert_eq!(
-            parsed.corrections,
-            ["Hydrogen Fuel commodity, read \"Hydragen Fuel\""]
+            parsed.reads,
+            [Read {
+                kind: ReadKind::Commodity,
+                read: "Hydragen Fuel".into(),
+                known: "Hydrogen Fuel".into()
+            }]
         );
     }
 }

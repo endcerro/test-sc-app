@@ -199,8 +199,17 @@ pub fn details_info(text: &str) -> DetailsInfo {
 /// Groups OCR lines into bullets and parses them. Lines before the first bullet and bullets
 /// that don't parse (cut off at a scroll edge) are dropped.
 pub fn objective_items(lines: &[String]) -> Vec<ObjectiveItem> {
-    let mut segments: Vec<String> = Vec::new();
-    for raw in lines {
+    objective_segments(lines)
+        .into_iter()
+        .map(|(item, _)| item)
+        .collect()
+}
+
+/// Like [`objective_items`], with the indices of the input lines each bullet was read from
+/// (to find a value back on the screenshot).
+pub fn objective_segments(lines: &[String]) -> Vec<(ObjectiveItem, std::ops::Range<usize>)> {
+    let mut segments: Vec<(String, std::ops::Range<usize>)> = Vec::new();
+    for (i, raw) in lines.iter().enumerate() {
         let line = clean_text(raw);
         if line.is_empty() {
             continue;
@@ -208,15 +217,19 @@ pub fn objective_items(lines: &[String]) -> Vec<ObjectiveItem> {
         let started =
             leading_keyword(&line, "Deliver").or_else(|| leading_keyword(&line, "Collect"));
         match (started, segments.last_mut()) {
-            (Some(item), _) => segments.push(item),
-            (None, Some(last)) => {
+            (Some(item), _) => segments.push((item, i..i + 1)),
+            (None, Some((last, range))) => {
                 last.push(' ');
                 last.push_str(&line);
+                range.end = i + 1;
             }
             (None, None) => {}
         }
     }
-    segments.iter().filter_map(|s| objective_item(s)).collect()
+    segments
+        .into_iter()
+        .filter_map(|(s, range)| objective_item(&s).map(|item| (item, range)))
+        .collect()
 }
 
 /// Parses one bullet: `Deliver 0/4 SCU of [!] E'tam to Riker Memorial Spaceport in Area18.`

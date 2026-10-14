@@ -16,6 +16,7 @@ sc-data.workspace = true
 sc-contracts.workspace = true
 sc-ocr.workspace = true
 anyhow.workspace = true
+arboard = { version = "3.6", default-features = false }
 clap.workspace = true
 directories.workspace = true
 eframe.workspace = true
@@ -23,6 +24,7 @@ image.workspace = true
 rfd = "0.17"
 serde.workspace = true
 serde_json.workspace = true
+strsim.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

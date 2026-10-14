@@ -3329,6 +3329,7 @@ name = "sc-companion"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arboard",
  "clap",
  "directories",
  "eframe",
@@ -3340,6 +3341,7 @@ dependencies = [
  "sc-universe",
  "serde",
  "serde_json",
+ "strsim",
  "tempfile",
  "tracing",
  "tracing-subscriber",

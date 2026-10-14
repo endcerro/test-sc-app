@@ -1,10 +1,13 @@
 //! The saved contract list: one `<id>.json` per contract in the store directory, holding the
-//! contract as flows (with the player's edits and loaded flags), the OCR corrections and the
-//! raw OCR text of every screenshot (so it can be re-parsed, and scrolled shots merged).
+//! contract as flows (with the player's edits and loaded flags), what snapping changed, the
+//! values the player confirmed and the raw OCR text and line boxes of every screenshot (so
+//! it can be re-parsed, scrolled shots merged, and values shown on their pixels). Place
+//! names the player taught are in `place_names.json`.
 //!
 //! `id` is the time the contract was added, in Unix milliseconds. Stores written by the
 //! first version (`<id>.txt` in `#HAULING v1` + `<id>.ocr.json`) are converted on open.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -13,18 +16,21 @@ use sc_contracts::{Contract, DropOff, Flow, Place, truth};
 use sc_universe::{Universe, normalize};
 use serde::{Deserialize, Serialize};
 
-use super::{ShotText, parse};
+use super::fields::{self, Field};
+use super::{Read, ReadKind, ShotText, parse};
 
 /// One saved contract.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Entry {
     pub id: u64,
     pub contract: Contract,
     /// Screenshots it was read from, in the order they were added. Empty for imported
     /// contracts without OCR text.
     pub shots: Vec<ShotText>,
-    /// Names the parser corrected when reading the screenshots (see `contracts::parse`).
-    pub corrections: Vec<String>,
+    /// Names snapping changed when reading the screenshots (see `contracts::parse`).
+    pub reads: Vec<Read>,
+    /// Values the player confirmed, as (field label, text): typed, or Enter pressed on them.
+    pub confirmed: Vec<(String, String)>,
     /// Changed by the player since it was parsed.
     pub edited: bool,
     /// A screenshot was merged in after the player edited it, so the contract does not
@@ -56,7 +62,8 @@ impl Entry {
                 .any(|old| old.loaded && same_flow(old, flow));
         }
         self.contract = contract;
-        self.corrections = parsed.corrections;
+        self.reads = parsed.reads;
+        self.confirmed.clear();
         self.edited = false;
         self.stale = false;
     }
@@ -99,6 +106,8 @@ pub struct ContractStore {
     dir: PathBuf,
     /// Newest first.
     entries: Vec<Entry>,
+    /// Place names as written -> known place, taught by the player.
+    place_names: BTreeMap<String, String>,
 }
 
 impl ContractStore {
@@ -116,8 +125,19 @@ impl ContractStore {
         let mut store = Self {
             dir: dir.into(),
             entries: Vec::new(),
+            place_names: BTreeMap::new(),
         };
         let mut warnings = Vec::new();
+        match std::fs::read_to_string(store.names_path()) {
+            Ok(json) => match serde_json::from_str(&json) {
+                Ok(names) => store.place_names = names,
+                Err(e) => warnings.push(format!("{}: {e}", store.names_path().display())),
+            },
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                warnings.push(format!("{}: {e}", store.names_path().display()));
+            }
+            Err(_) => {}
+        }
         let paths: Vec<PathBuf> = std::fs::read_dir(&store.dir)
             .map(|rd| rd.flatten().map(|e| e.path()).collect())
             .unwrap_or_default();
@@ -190,9 +210,8 @@ impl ContractStore {
             id: self.next_id(),
             contract: parsed.contract,
             shots: vec![shot],
-            corrections: parsed.corrections,
-            edited: false,
-            stale: false,
+            reads: parsed.reads,
+            ..Entry::default()
         };
         self.save(&entry)?;
         let id = entry.id;
@@ -200,21 +219,114 @@ impl ContractStore {
         Ok(Added::New(id))
     }
 
-    /// Saves the player's changes to an entry's contract. Only changes to what was read
-    /// mark it edited; ticking "loaded" does not.
-    pub fn update(&mut self, id: u64, contract: Contract) -> Result<()> {
+    /// Adds a contract typed or pasted by the player (no screenshot). Returns its id.
+    pub fn add_contract(&mut self, contract: Contract) -> Result<u64> {
+        let entry = Entry {
+            id: self.next_id(),
+            contract,
+            ..Entry::default()
+        };
+        self.save(&entry)?;
+        let id = entry.id;
+        self.entries.insert(0, entry);
+        Ok(id)
+    }
+
+    /// Sets a field from what the player typed (an unchanged value too: that confirms it).
+    pub fn edit(&mut self, id: u64, f: Field, value: &str) -> Result<()> {
+        self.modify(id, |e| {
+            fields::set(&mut e.contract, f, value);
+            let text = fields::text(&e.contract, f);
+            let key = (f.label().to_owned(), text);
+            if !key.1.is_empty() && !e.confirmed.contains(&key) {
+                e.confirmed.push(key);
+            }
+        })
+    }
+
+    /// Ticks or unticks "loaded" on line `k` (not an edit of what was read).
+    pub fn set_loaded(&mut self, id: u64, k: usize, loaded: bool) -> Result<()> {
+        self.modify(id, |e| {
+            if let Some(f) = e.contract.flows.get_mut(k) {
+                f.loaded = loaded;
+            }
+        })
+    }
+
+    pub fn add_line(&mut self, id: u64) -> Result<()> {
+        self.modify(id, |e| fields::add_line(&mut e.contract))
+    }
+
+    pub fn remove_line(&mut self, id: u64, k: usize) -> Result<()> {
+        self.modify(id, |e| {
+            if k < e.contract.flows.len() {
+                e.contract.flows.remove(k);
+            }
+        })
+    }
+
+    /// The "Use ..." fix: replaces a misread place everywhere in the contract.
+    pub fn apply_fix(&mut self, id: u64, written: &str, suggestion: &str) -> Result<()> {
+        self.modify(id, |e| {
+            fields::replace_place(&mut e.contract, written, suggestion);
+            let key = ("pickup".to_owned(), suggestion.to_owned());
+            let drop_key = ("drop-off".to_owned(), suggestion.to_owned());
+            for k in [key, drop_key] {
+                if !e.confirmed.contains(&k) {
+                    e.confirmed.push(k);
+                }
+            }
+        })
+    }
+
+    /// Changes an entry with `change` and saves it. Changes to what was read (anything but
+    /// the loaded flags) mark it edited.
+    fn modify(&mut self, id: u64, change: impl FnOnce(&mut Entry)) -> Result<()> {
         let Some(i) = self.entries.iter().position(|e| e.id == id) else {
             bail!("contract {id} not found");
         };
         let mut entry = self.entries[i].clone();
-        if entry.contract == contract {
+        change(&mut entry);
+        if entry == self.entries[i] {
             return Ok(());
         }
-        entry.edited |= without_loaded(&entry.contract) != without_loaded(&contract);
-        entry.contract = contract;
+        entry.edited |=
+            without_loaded(&entry.contract) != without_loaded(&self.entries[i].contract);
         self.save(&entry)?;
         self.entries[i] = entry;
         Ok(())
+    }
+
+    /// Place names the player taught: as written -> known place.
+    pub fn place_names(&self) -> &BTreeMap<String, String> {
+        &self.place_names
+    }
+
+    /// Remembers that the game's `written` name means `place`.
+    pub fn remember(&mut self, written: &str, place: &str) -> Result<()> {
+        let mut names = self.place_names.clone();
+        names.insert(written.trim().to_owned(), place.trim().to_owned());
+        self.save_names(names)
+    }
+
+    pub fn forget(&mut self, written: &str) -> Result<()> {
+        let mut names = self.place_names.clone();
+        names.remove(written);
+        self.save_names(names)
+    }
+
+    fn save_names(&mut self, names: BTreeMap<String, String>) -> Result<()> {
+        std::fs::create_dir_all(&self.dir)
+            .with_context(|| format!("creating {}", self.dir.display()))?;
+        let path = self.names_path();
+        std::fs::write(&path, serde_json::to_string_pretty(&names)?)
+            .with_context(|| format!("writing {}", path.display()))?;
+        self.place_names = names;
+        Ok(())
+    }
+
+    fn names_path(&self) -> PathBuf {
+        self.dir.join("place_names.json")
     }
 
     /// Rebuilds an entry from its screenshots, discarding the player's edits (loaded flags
@@ -308,9 +420,7 @@ fn load_old_entry(txt: &Path, id: u64) -> Result<Entry> {
         id,
         contract: Contract::from_objectives(&objectives),
         shots,
-        corrections: Vec::new(),
-        edited: false,
-        stale: false,
+        ..Entry::default()
     })
 }
 
@@ -325,11 +435,22 @@ struct EntryFile {
     #[serde(default)]
     shots: Vec<ShotText>,
     #[serde(default)]
-    corrections: Vec<String>,
+    reads: Vec<ReadFile>,
+    #[serde(default)]
+    confirmed: Vec<(String, String)>,
     #[serde(default)]
     edited: bool,
     #[serde(default)]
     stale: bool,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct ReadFile {
+    /// `commodity` or `place`.
+    kind: String,
+    read: String,
+    known: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -408,7 +529,20 @@ impl From<&Entry> for EntryFile {
                     .collect(),
             },
             shots: e.shots.clone(),
-            corrections: e.corrections.clone(),
+            reads: e
+                .reads
+                .iter()
+                .map(|r| ReadFile {
+                    kind: match r.kind {
+                        ReadKind::Commodity => "commodity",
+                        ReadKind::Place => "place",
+                    }
+                    .to_owned(),
+                    read: r.read.clone(),
+                    known: r.known.clone(),
+                })
+                .collect(),
+            confirmed: e.confirmed.clone(),
             edited: e.edited,
             stale: e.stale,
         }
@@ -454,7 +588,20 @@ impl EntryFile {
                     .collect(),
             },
             shots: self.shots,
-            corrections: self.corrections,
+            reads: self
+                .reads
+                .into_iter()
+                .map(|r| Read {
+                    kind: if r.kind == "commodity" {
+                        ReadKind::Commodity
+                    } else {
+                        ReadKind::Place
+                    },
+                    read: r.read,
+                    known: r.known,
+                })
+                .collect(),
+            confirmed: self.confirmed,
             edited: self.edited,
             stale: self.stale,
         }
@@ -488,6 +635,7 @@ mod tests {
             reward: read("reward"),
             details: read("details"),
             objectives: read("objectives"),
+            ..ShotText::default()
         }
     }
 
@@ -543,10 +691,8 @@ mod tests {
         let dir = temp();
         let (mut store, _) = ContractStore::open(dir.path());
         let first = add(&mut store, "09-redwind-yela-scroll-1");
-        let mut contract = store.entries()[0].contract.clone();
-        contract.flows[0].loaded = true;
         store
-            .update(first.id(), contract)
+            .set_loaded(first.id(), 0, true)
             .unwrap_or_else(|e| panic!("{e}"));
         assert!(!store.entries()[0].edited, "loaded is not an edit");
 
@@ -569,11 +715,10 @@ mod tests {
         let dir = temp();
         let (mut store, _) = ContractStore::open(dir.path());
         let id = add(&mut store, "09-redwind-yela-scroll-1").id();
-        let mut contract = store.entries()[0].contract.clone();
-        contract.availability = Some("1h".into());
         store
-            .update(id, contract.clone())
+            .edit(id, Field::Availability, "1h")
             .unwrap_or_else(|e| panic!("{e}"));
+        let contract = store.entries()[0].contract.clone();
 
         assert_eq!(
             add(&mut store, "09-redwind-yela-scroll-2"),
@@ -615,6 +760,65 @@ mod tests {
         assert!(!dir.path().join("100.txt").exists());
         assert!(!dir.path().join("100.ocr.json").exists());
         assert_eq!(ContractStore::open(dir.path()).0.entries(), store.entries());
+    }
+
+    #[test]
+    fn edits_confirm_and_mark_edited() {
+        let dir = temp();
+        let (mut store, _) = ContractStore::open(dir.path());
+        let id = add(&mut store, "06-covalex-wideforest-multidrop").id();
+        let edit = |store: &mut ContractStore, f, v: &str| {
+            store.edit(id, f, v).unwrap_or_else(|e| panic!("{e}"));
+        };
+        // Enter on an unchanged value confirms it, without editing.
+        edit(&mut store, Field::Reward, "49,750");
+        let e = &store.entries()[0];
+        assert!(!e.edited);
+        assert_eq!(e.confirmed, [("reward".to_owned(), "49,750".to_owned())]);
+
+        store
+            .set_loaded(id, 0, true)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert!(!store.entries()[0].edited, "loaded is not an edit");
+        edit(&mut store, Field::DropScu(0, 1), "7");
+        store.add_line(id).unwrap_or_else(|e| panic!("{e}"));
+        store.remove_line(id, 1).unwrap_or_else(|e| panic!("{e}"));
+        store
+            .apply_fix(id, "Baijini Point above ArcCorp", "Baijini Point")
+            .unwrap_or_else(|e| panic!("{e}"));
+        let e = &store.entries()[0];
+        assert!(e.edited);
+        assert_eq!(e.contract.flows.len(), 1);
+        assert_eq!(e.contract.flows[0].scu(), 12);
+        assert_eq!(e.contract.flows[0].dropoffs[1].place.name, "Baijini Point");
+        assert_eq!(ContractStore::open(dir.path()).0.entries(), store.entries());
+
+        let manual = store
+            .add_contract(Contract::default())
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(store.entries()[0].id, manual);
+    }
+
+    #[test]
+    fn taught_place_names_persist() {
+        let dir = temp();
+        let (mut store, _) = ContractStore::open(dir.path());
+        store
+            .remember("ArcCorp's Yela facility", "ArcCorp Mining Area 157")
+            .unwrap_or_else(|e| panic!("{e}"));
+        let (again, warnings) = ContractStore::open(dir.path());
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert_eq!(
+            again
+                .place_names()
+                .get("ArcCorp's Yela facility")
+                .map(String::as_str),
+            Some("ArcCorp Mining Area 157")
+        );
+        store
+            .forget("ArcCorp's Yela facility")
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert!(ContractStore::open(dir.path()).0.place_names().is_empty());
     }
 
     #[test]

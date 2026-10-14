@@ -10,7 +10,9 @@ use sc_data::UniverseSource;
 use sc_universe::{Leg, Location, LocationId, LocationKind, LookupOptions, Match, Universe};
 
 use crate::SourceArgs;
-use crate::contracts::{self, ContractReader, ContractStore, Entry, store::Added};
+use crate::contracts::places::Places;
+use crate::contracts::review::{self, Lookup};
+use crate::contracts::{self, ContractReader, ContractStore, Entry, fields, store::Added};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -318,18 +320,7 @@ fn read_contracts(
             .with_context(|| format!("reading {}", path.display()))?;
         eprintln!("read {} in {:.1?}", path.display(), started.elapsed());
         if raw {
-            for (region, text) in [
-                ("title", &shot.title),
-                ("reward", &shot.reward),
-                ("details", &shot.details),
-                ("objectives", &shot.objectives),
-            ] {
-                println!(
-                    "--- {region}
-{text}"
-                );
-            }
-            println!("---");
+            print_raw(&shot);
         }
         let entry = match &mut store {
             Some(store) => {
@@ -347,12 +338,10 @@ fn read_contracts(
             None => {
                 let parsed = contracts::parse(std::slice::from_ref(&shot), u);
                 Entry {
-                    id: 0,
                     contract: parsed.contract,
                     shots: vec![shot],
-                    corrections: parsed.corrections,
-                    edited: false,
-                    stale: false,
+                    reads: parsed.reads,
+                    ..Entry::default()
                 }
             }
         };
@@ -363,11 +352,59 @@ fn read_contracts(
         for flow in &entry.contract.flows {
             println!("flow: {}", contracts::flow_line(flow));
         }
-        let mut known = |name: &str| sc_contracts::snap::resolve_place(u, name).is_some();
-        for check in contracts::checks::checks(&entry, &mut known) {
-            println!("check: {check}");
+        let names = store
+            .as_ref()
+            .map(|s| s.place_names().clone())
+            .unwrap_or_default();
+        let places = Places::new(u, &names);
+        let lk = Lookup {
+            universe: u,
+            places: &places,
+        };
+        let r = review::review(&entry, lk);
+        for p in &r.problems {
+            println!("problem: {p}");
+        }
+        if !r.unsure.is_empty() {
+            println!("check: {} (low-confidence read)", r.unsure.join(", "));
+        }
+        for n in &r.notes {
+            println!("check: {n}");
+        }
+        for f in &r.fixes {
+            println!("fix: use \"{}\" for \"{}\"", f.suggestion, f.written);
+        }
+        for f in fields::all(&entry.contract) {
+            if review::mark(&entry, f, lk) == review::Mark::Bad {
+                println!(
+                    "missing or unknown: {} \"{}\"",
+                    f.label(),
+                    fields::text(&entry.contract, f)
+                );
+            }
         }
         println!();
     }
     Ok(())
+}
+
+/// Each region's lines with their engine confidence and box.
+fn print_raw(shot: &contracts::ShotText) {
+    for region in sc_ocr::Region::ALL {
+        println!("--- {}", region.name());
+        for (text, b) in shot.lines(region) {
+            match b {
+                Some(b) => println!(
+                    "{:>5} [{},{} {}x{}] {text}",
+                    b.conf.map_or("-".to_owned(), |c| format!("{c:.3}")),
+                    b.x,
+                    b.y,
+                    b.w,
+                    b.h
+                ),
+                None => println!("    - {text}"),
+            }
+        }
+    }
+    println!("---");
 }

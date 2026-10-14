@@ -23,7 +23,7 @@ use thiserror::Error;
 pub use engine::{OcrEngine, OcrLine, OcrOutput};
 pub use layout::{Bullet, BulletKind, Layout, Rect, Region};
 pub use preprocess::{OcrImage, Pipeline};
-pub use screen::{ScreenText, read_contract_screen, recommended_pipeline};
+pub use screen::{ScreenLine, ScreenText, read_contract_screen, recommended_pipeline, text_of};
 
 #[derive(Debug, Error)]
 pub enum OcrError {

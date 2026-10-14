@@ -247,18 +247,24 @@ cargo run -p sc-companion --release --features ocr -- contract samples/03-redwin
 - Every dropped file is read on a background thread, one at a time, then parsed into
   flows (`sc_contracts::Contract`, see `docs/architecture.md`) and saved in
   `<data dir>/sc-companion/contracts` (override with `--contracts-dir`) as `<id>.json`: the
-  contract (with the player's edits and loaded flags), the snapping corrections and the raw
-  region text of every screenshot. Stores of the first version (`<id>.txt` + `<id>.ocr.json`)
-  are converted on open.
+  contract (with the player's edits, confirmations and loaded flags), the snapping
+  corrections and, for every screenshot, the raw region text with each line's box and
+  engine confidence (to show a value's pixels). Stores of the first version (`<id>.txt` +
+  `<id>.ocr.json`) are converted on open.
 - A screenshot whose title, reward and contractor match a saved contract is merged into it
   (`contract_from_shots`, then re-parsed), so dropping 09-1 then 09-2 gives the merged truth.
   A contract the player edited is not re-parsed: the shot is attached and a check asks to
   re-parse (which discards the edits; loaded flags are kept).
-- Checks shown on a card: names snapping changed (low-confidence reads, e.g. `E'tam
-  commodity, read "Etam"`), inferred pickups (`?`), places not found in the universe,
-  missing title/reward, broken lines. Descriptive places such as `ArcCorp's Yela facility`
-  have no starmap counterpart and show as not found until an alias is added.
-- `sc-companion contract FILE...` prints the `#HAULING` objectives, the flows and the checks.
+- Doubtful reads are flagged per field: names snapping changed (sample 03's `Baljini` ->
+  `Baijini`), inferred pickups (`?`), ambiguous places, and lines PaddleOCR read below 0.85
+  confidence. On the samples every line was read right and the lowest confidence was 0.859
+  (`2h 1m`); reward lines sit near 0.90 because of the currency glyph, so a higher threshold
+  would flag correct values.
+- Descriptive places such as `ArcCorp's Yela facility` have no starmap counterpart: they show
+  as unknown until the player types the real place (`ArcCorp Mining Area 157`) and accepts
+  to remember the name.
+- `sc-companion contract [--raw] FILE...` prints the `#HAULING` objectives, the flows, the
+  checks, fixes and missing/unknown fields (`--raw`: each OCR line with confidence and box).
 - On the samples the app output matches the truth files except that the thin `|` title
   separators are sometimes not read (01, 02, 06); scoring ignores punctuation in titles.
 

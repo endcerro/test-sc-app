@@ -109,18 +109,29 @@ side panels and central area.
 - `inspector.rs`: all `Location` fields, amenities, aliases, children, jump links, and the
   distance/route from the focus or a pinned "measure from" location.
 
-**Contracts pane** (`gui/contracts/`, a temporary view: the UI will be redesigned, the
-`contracts` reader/store underneath are meant to stay): a drop box (files dropped anywhere in
-the window, or a file dialog) feeds `worker.rs`, a thread that owns the `ContractReader` and
-reads one screenshot at a time (models downloaded and the engine loaded on the first one).
-Each result is parsed into flows, snapped to the universe and saved through
-`contracts::ContractStore` (merged into an existing entry when title, reward and contractor
-match), then shown as an editable card (`card.rs`) in the column: header fields, one row per
-flow (SCU | cargo | pickups | drop-offs | loaded) with each place's resolved universe path,
-"Check:" lines from `contracts::checks`, "Show capture" (screenshots, OCR text, re-parse) and
-a footer. Edits go through a `Draft` (every field as typed text, `draft.rs`) and are saved
-when a field loses focus or a button/checkbox is used. The "+" for a place is disabled when
-it would give a line several pickups *and* several drop-offs.
+**Contracts pane** (`gui/contracts/`, a temporary view ported from the hauling planner's
+contract board; the `contracts` modules underneath are meant to stay): a drop box (files
+dropped anywhere in the window, or a file dialog) feeds `worker.rs`, a thread that owns the
+`ContractReader` and reads one screenshot at a time; a paste box imports and exports
+`#HAULING v1` text (`contracts::board_text`). Each screenshot is parsed into flows, snapped
+and saved through `contracts::ContractStore`, then shown as a card (`card.rs`) on the board,
+oldest first (`#1` at the top):
+
+- Every value is a `contracts::fields::Field`. Fields are `widgets::field`s with an edit
+  buffer that commit on Enter or when focus leaves (Enter on an unchanged value confirms a
+  flagged read); place fields offer known places while typing (`places::Places::suggest`).
+- `contracts::review` marks each field: red when it blocks planning (missing reward, SCU or
+  place, unknown place), dashed amber when it is a doubtful read (inferred `?` pickup, name
+  changed by snapping, ambiguous place, OCR line below `LOW_CONFIDENCE`) and not yet
+  confirmed. "Next to check (n) · F8" walks them in board order.
+- Hovering a field (or focusing it, under the cargo lines) shows the outlined crop of the
+  screenshot it was read from: OCR lines keep their box and confidence (`ShotText::boxes`)
+  and `contracts::sources::locate` finds a value back by content.
+- Under each place: its universe path, the candidates of a shared name, or "unknown place";
+  "Use X for Y" buttons offer a close spelling; replacing an unknown name by a known place
+  offers to remember it (`place_names.json`, applied by `Places`).
+- The "+" for a place is disabled when it would give a line several pickups *and* several
+  drop-offs. Reviews are cached per entry until it changes.
 
 ### Name lookup (for OCR)
 

@@ -3,6 +3,7 @@
 mod contracts;
 mod loader;
 mod map;
+pub mod theme;
 
 use anyhow::{Result, anyhow};
 use contracts::ContractsPane;
@@ -61,7 +62,7 @@ struct CompanionApp {
 
 impl CompanionApp {
     fn new(ctx: &egui::Context, args: SourceArgs) -> Self {
-        ctx.set_visuals(egui::Visuals::dark());
+        theme::apply(ctx);
         let state = LoadState::start(&args, ctx);
         Self {
             args,

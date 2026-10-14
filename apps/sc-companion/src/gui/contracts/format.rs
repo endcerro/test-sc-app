@@ -1,27 +1,25 @@
-//! Text shown on contract cards (pure, tested; painting is in `card.rs`).
+//! Text shown on the board (pure, tested; painting is in `card.rs`).
 
 use sc_contracts::truth;
 
 use crate::contracts::Entry;
 
-/// `525,500` (empty when unknown).
-pub fn reward(reward: Option<u64>) -> String {
-    reward.map(truth::thousands).unwrap_or_default()
+/// `525,500`.
+pub fn money(v: u64) -> String {
+    truth::thousands(v)
 }
 
-/// Digits of a typed number (`525,500 aUEC` -> 525500); `None` when there are none.
-pub fn parse_number<T: std::str::FromStr>(text: &str) -> Option<T> {
-    let digits: String = text.chars().filter(char::is_ascii_digit).collect();
-    digits.parse().ok()
-}
-
-/// `44 SCU · 3 lines · captured 2026-10-14 04:17 UTC · 2 screenshots · edited`.
+/// `44 SCU · captured 2026-10-14 04:17 UTC · 2 screenshots · edited`. Contracts typed or
+/// pasted in say "added" instead of "captured".
 pub fn footer(e: &Entry) -> String {
-    let lines = e.contract.flows.len();
+    let verb = if e.shots.is_empty() {
+        "added"
+    } else {
+        "captured"
+    };
     let mut parts = vec![
         format!("{} SCU", e.contract.total_scu()),
-        format!("{lines} line{}", if lines == 1 { "" } else { "s" }),
-        format!("captured {}", utc_minutes(e.id)),
+        format!("{verb} {}", utc_minutes(e.id)),
     ];
     if e.shots.len() > 1 {
         parts.push(format!("{} screenshots", e.shots.len()));
@@ -63,16 +61,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn numbers() {
-        assert_eq!(reward(Some(525_500)), "525,500");
-        assert_eq!(reward(None), "");
-        assert_eq!(parse_number::<u64>("525,500 aUEC"), Some(525_500));
-        assert_eq!(parse_number::<u32>(" 16 "), Some(16));
-        assert_eq!(parse_number::<u32>(""), None);
-        assert_eq!(parse_number::<u32>("99999999999"), None);
-    }
-
-    #[test]
     fn dates() {
         assert_eq!(utc_minutes(0), "1970-01-01 00:00 UTC");
         assert_eq!(utc_minutes(951_782_400_000), "2000-02-29 00:00 UTC");
@@ -91,27 +79,21 @@ mod tests {
             ..Flow::default()
         };
         let mut e = Entry {
-            id: 0,
             contract: Contract {
                 flows: vec![flow(32), flow(20)],
                 ..Contract::default()
             },
             shots: vec![Default::default(), Default::default()],
-            corrections: Vec::new(),
             edited: true,
-            stale: false,
+            ..Entry::default()
         };
         assert_eq!(
             footer(&e),
-            "52 SCU \u{b7} 2 lines \u{b7} captured 1970-01-01 00:00 UTC \u{b7} 2 screenshots \
-             \u{b7} edited"
+            "52 SCU \u{b7} captured 1970-01-01 00:00 UTC \u{b7} 2 screenshots \u{b7} edited"
         );
-        e.contract.flows.truncate(1);
-        e.shots.truncate(1);
+        e.shots.clear();
         e.edited = false;
-        assert_eq!(
-            footer(&e),
-            "32 SCU \u{b7} 1 line \u{b7} captured 1970-01-01 00:00 UTC"
-        );
+        assert_eq!(footer(&e), "52 SCU \u{b7} added 1970-01-01 00:00 UTC");
+        assert_eq!(money(525_500), "525,500");
     }
 }
