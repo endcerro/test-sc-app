@@ -223,8 +223,34 @@ lowest-CER details read `Pyro II` for `Pyro III`, while a config with slightly h
 - In the reduced preset x3, Sauvola and despeckle are only tried on 4 strong baselines, so their
   axis averages look better than they would in the full grid.
 - Follow-ups: add planet designations (`Pyro III` = Bloom) as aliases in sc-data so parents can
-  be checked against the universe; capture the screen in the app and run this pipeline; give
-  the Paddle sessions more threads in the app and measure latency again.
+  be checked against the universe; capture the screen directly (hotkey) instead of dropping
+  screenshot files; read the `|` title separators reliably.
+
+## In the app
+
+The **Contracts** pane of `sc-companion` (and its `contract` CLI command) runs the
+recommended setup: `paddle/v3+en`, anchored crops, `sc_ocr::recommended_pipeline(height)`
+(`max/-/xN/-/despeckle/native`, N from the screen height), commodity + place snapping against
+the loaded universe.
+
+```sh
+cargo run -p sc-companion --release --features ocr                  # drop screenshots on the Contracts pane
+cargo run -p sc-companion --release --features ocr -- contract samples/03-redwind-ruin-baijini.webp
+```
+
+- The `ocr` feature is off by default (CI stays ONNX-free); without it the pane lists saved
+  contracts and says the build has no OCR.
+- The three model files (~10 MB) are downloaded on the first read into the same model dir
+  the benchmark uses (`sc_ocr::models::default_dir`), checked against their pinned sha256.
+- The four regions are read concurrently (4 sessions per model): about 1.5-2 s per 1080p
+  screenshot on a Ryzen 7 9800X3D, plus ~0.5 s to load the engine on the first one.
+- Every dropped file is read on a background thread, one at a time, then parsed and saved in
+  `<data dir>/sc-companion/contracts` (override with `--contracts-dir`): `<id>.txt` is the
+  contract in `#HAULING v1` (+ `# source:` comments), `<id>.ocr.json` the raw region text.
+  A screenshot whose title, reward and contractor match a saved contract is merged into it
+  (`contract_from_shots`), so dropping 09-1 then 09-2 gives the merged truth.
+- On the samples the app output matches the truth files except that the thin `|` title
+  separators are sometimes not read (01, 02, 06); scoring ignores punctuation in titles.
 
 ## Adding samples
 

@@ -1,5 +1,7 @@
-//! Terminal inspector for the universe data (`summary`, `tree`, `find`, `dist`, `trading`).
+//! Terminal inspector for the universe data (`summary`, `tree`, `find`, `dist`, `trading`)
+//! and contract screenshot reader (`contract`).
 
+use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{Context, Result, bail};
@@ -8,6 +10,7 @@ use sc_data::UniverseSource;
 use sc_universe::{Leg, Location, LocationId, LocationKind, LookupOptions, Match, Universe};
 
 use crate::SourceArgs;
+use crate::contracts::{self, ContractReader, ContractStore, store::Added};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -41,6 +44,19 @@ pub enum Command {
     Trading {
         /// System or location subtree.
         scope: Option<String>,
+    },
+    /// OCR hauling contract screenshots and print them as `#HAULING v1` (needs the `ocr`
+    /// feature).
+    Contract {
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Add them to the saved contract list shown in the GUI (shots of the same contract
+        /// are merged; see --contracts-dir).
+        #[arg(long)]
+        save: bool,
+        /// Also print the raw OCR text of each region.
+        #[arg(long)]
+        raw: bool,
     },
 }
 
@@ -137,6 +153,9 @@ pub fn run(source: &SourceArgs, command: Command) -> Result<()> {
                 println!("{r}");
             }
             println!("{} trading locations", rows.len());
+        }
+        Command::Contract { files, save, raw } => {
+            read_contracts(u, &files, save.then(|| source.contracts_dir()), raw)?;
         }
     }
     Ok(())
@@ -276,4 +295,61 @@ fn print_tree(
     } else if !l.children.is_empty() {
         println!("{}… {} more", "  ".repeat(indent + 1), l.children.len());
     }
+}
+
+fn read_contracts(
+    u: &Universe,
+    files: &[PathBuf],
+    store_dir: Option<PathBuf>,
+    raw: bool,
+) -> Result<()> {
+    let mut reader = ContractReader::new();
+    let mut store = store_dir.map(|dir| {
+        let (store, warnings) = ContractStore::open(dir);
+        for w in warnings {
+            eprintln!("warning: {w}");
+        }
+        store
+    });
+    for path in files {
+        let started = Instant::now();
+        let shot = reader
+            .read(path, &mut |status| eprintln!("{status}"))
+            .with_context(|| format!("reading {}", path.display()))?;
+        eprintln!("read {} in {:.1?}", path.display(), started.elapsed());
+        if raw {
+            for (region, text) in [
+                ("title", &shot.title),
+                ("reward", &shot.reward),
+                ("details", &shot.details),
+                ("objectives", &shot.objectives),
+            ] {
+                println!(
+                    "--- {region}
+{text}"
+                );
+            }
+            println!("---");
+        }
+        let contract = match &mut store {
+            Some(store) => {
+                let added = store.add_shot(shot, u)?;
+                let verb = match added {
+                    Added::New(_) => "saved as",
+                    Added::Merged(_) => "merged into",
+                };
+                eprintln!(
+                    "{verb} {}",
+                    store.dir().join(format!("{}.txt", added.id())).display()
+                );
+                store
+                    .get(added.id())
+                    .map(|e| e.contract.clone())
+                    .unwrap_or_default()
+            }
+            None => contracts::parse(std::slice::from_ref(&shot), u),
+        };
+        println!("{}", sc_contracts::truth::serialize(&contract));
+    }
+    Ok(())
 }

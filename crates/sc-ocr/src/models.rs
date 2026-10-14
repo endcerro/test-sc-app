@@ -1,7 +1,8 @@
 //! Model files used by the engines: where to download them and where they live on disk.
 //!
-//! Downloading is the only network step (done by the benchmark's `fetch-models` command or,
-//! later, by the app at first launch); OCR itself runs offline.
+//! Downloading is the only network step (the benchmark's `fetch-models` command, or the app
+//! the first time it reads a screenshot), behind the `download` feature; OCR itself runs
+//! offline.
 
 use std::path::{Path, PathBuf};
 
@@ -93,6 +94,10 @@ pub const ALL: &[ModelFile] = &[
     PADDLE_DICT_LATIN_V5,
 ];
 
+/// What the app uses: PP-OCRv3 mobile detection + PP-OCRv5 English recognition
+/// (`paddle/v3+en`, the benchmark's recommendation).
+pub const PADDLE_RECOMMENDED: &[ModelFile] = &[PADDLE_DET_V3, PADDLE_REC_EN_V5, PADDLE_DICT_EN_V5];
+
 /// Directory holding the model files.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelDir(pub PathBuf);
@@ -113,4 +118,82 @@ impl ModelDir {
     pub fn root(&self) -> &Path {
         &self.0
     }
+}
+
+/// Default model directory: the app cache dir (`.../sc-companion/models`).
+#[cfg(feature = "download")]
+pub fn default_dir() -> PathBuf {
+    directories::ProjectDirs::from("", "", "sc-companion")
+        .map(|d| d.cache_dir().join("models"))
+        .unwrap_or_else(|| std::env::temp_dir().join("sc-companion").join("models"))
+}
+
+/// Lowercase hex SHA-256 of `bytes`.
+#[cfg(feature = "download")]
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Downloads the missing `files` into `dir` and checks every file against its pinned
+/// SHA-256. `on_download` is called before each download.
+#[cfg(feature = "download")]
+pub fn fetch(
+    dir: &ModelDir,
+    files: &[ModelFile],
+    mut on_download: impl FnMut(&ModelFile),
+) -> Result<(), crate::OcrError> {
+    use std::io::Read as _;
+
+    let err = |file: &ModelFile, message: String| crate::OcrError::Download {
+        file: file.name.to_owned(),
+        message,
+    };
+    let io = |path: &Path, source| crate::OcrError::Io {
+        path: path.to_owned(),
+        source,
+    };
+    std::fs::create_dir_all(dir.root()).map_err(|e| io(dir.root(), e))?;
+    for file in files {
+        let path = dir.path(file);
+        if !path.is_file() {
+            on_download(file);
+            let mut body = Vec::new();
+            ureq::get(file.url)
+                .call()
+                .map_err(|e| err(file, format!("GET {}: {e}", file.url)))?
+                .into_body()
+                .with_config()
+                .limit(512 * 1024 * 1024)
+                .reader()
+                .read_to_end(&mut body)
+                .map_err(|e| err(file, e.to_string()))?;
+            let hash = sha256_hex(&body);
+            if hash != file.sha256 {
+                return Err(err(
+                    file,
+                    format!("sha256 {hash} does not match pinned {}", file.sha256),
+                ));
+            }
+            // Write then rename, so an interrupted download never leaves a partial model.
+            let tmp = path.with_extension("part");
+            std::fs::write(&tmp, &body).map_err(|e| io(&tmp, e))?;
+            std::fs::rename(&tmp, &path).map_err(|e| io(&path, e))?;
+        }
+        let hash = sha256_hex(&std::fs::read(&path).map_err(|e| io(&path, e))?);
+        if hash != file.sha256 {
+            return Err(err(
+                file,
+                format!(
+                    "{}: sha256 {hash} does not match pinned {}",
+                    path.display(),
+                    file.sha256
+                ),
+            ));
+        }
+    }
+    Ok(())
 }

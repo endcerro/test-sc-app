@@ -1,9 +1,11 @@
 //! SC Companion entry point.
 //!
 //! Without a subcommand this opens the egui GUI. Subcommands (`summary`, `tree`, `find`,
-//! `dist`, `trading`) inspect the universe data from the terminal.
+//! `dist`, `trading`) inspect the universe data from the terminal; `contract` reads contract
+//! screenshots.
 
 mod cli;
+mod contracts;
 mod gui;
 
 use std::path::PathBuf;
@@ -24,7 +26,8 @@ struct Cli {
     command: Option<cli::Command>,
 }
 
-/// Where and how to load the universe data. Shared by the GUI and the CLI.
+/// Where and how to load the universe data and the saved contracts. Shared by the GUI and
+/// the CLI.
 #[derive(Debug, Clone, clap::Args)]
 pub struct SourceArgs {
     /// Read scunpacked-data files from this directory instead of downloading them.
@@ -45,9 +48,18 @@ pub struct SourceArgs {
     /// Don't derive venue aliases from the game's labels.json (curated aliases stay).
     #[arg(long, global = true)]
     no_label_aliases: bool,
+    /// Saved contract list directory (default: `contracts` in the app data dir).
+    #[arg(long, global = true)]
+    contracts_dir: Option<PathBuf>,
 }
 
 impl SourceArgs {
+    pub fn contracts_dir(&self) -> PathBuf {
+        self.contracts_dir
+            .clone()
+            .unwrap_or_else(contracts::ContractStore::default_dir)
+    }
+
     pub fn build(&self) -> ScunpackedSource {
         let options = LoadOptions {
             include_asteroid_scatter: self.asteroids,

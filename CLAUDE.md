@@ -11,8 +11,9 @@ Roadmap:
 2. **OCR** of in-game screens (commodity terminals, contracts) → resolve names to locations.
    Hauling contract screens: parsing + engine/preprocessing benchmark done (`docs/ocr.md`).
 3. **Cargo route optimizer** fed by OCR'd prices and the universe distances.
-4. **GUI** with egui/eframe (`apps/sc-companion`): pane shell + **Map** pane done; other panes
-   (trading, OCR) come with their tools.
+4. **GUI** with egui/eframe (`apps/sc-companion`): pane shell, **Map** pane and **Contracts**
+   pane (drop hauling contract screenshots -> OCR -> saved list) done; the Contracts view is a
+   temporary UI (the reader/store under it stay); trading comes with its tool.
 
 Read `docs/architecture.md` (design) and `docs/data-sources.md` (where the data comes from,
 file schemas, quirks) before changing the data layer, and `docs/ocr.md` before changing OCR.
@@ -26,10 +27,12 @@ file schemas, quirks) before changing the data layer, and `docs/ocr.md` before c
 | `crates/sc-data/data/aliases.json` | Hand-maintained aliases (embedded), keyed by starmap UUID. |
 | `crates/sc-data/tests/fixtures/scunpacked` | Trimmed real scunpacked files (game 4.10.2) used by offline tests. |
 | `crates/sc-contracts` | Pure: `HaulingContract` model, `#HAULING v1` truth format (`truth`), OCR text -> contract (`parse`, `repair`), scrolled-shot merge (`merge`), name snapping (`snap`, embedded `data/commodities.json`), scoring (`score`). **No IO.** |
-| `crates/sc-ocr` | Pixels -> text. `layout` (regions in a 1920x1080 reference frame, OFFERS-tab anchor, yellow bullet detection), `preprocess` (`Pipeline`: colour mask, top-hat, binarise, scale, despeckle, invert), `engine` (`OcrEngine` trait; `paddle`, `ocrs`, `winocr`, `tesseract` adapters behind features), `models` (pinned model URLs + sha256). |
+| `crates/sc-ocr` | Pixels -> text. `layout` (regions in a 1920x1080 reference frame, OFFERS-tab anchor, yellow bullet detection), `preprocess` (`Pipeline`: colour mask, top-hat, binarise, scale, despeckle, invert), `engine` (`OcrEngine` trait; `paddle`, `ocrs`, `winocr`, `tesseract` adapters behind features), `screen` (whole screenshot with the recommended settings), `models` (pinned model URLs + sha256; `fetch` behind the `download` feature). |
 | `tools/ocr-bench` | OCR benchmark: grid over engines x pipelines x crop modes, result cache, CER + end-to-end scoring, `summary.md` reports. Engines are opt-in features. |
 | `samples/` | Contract screenshots, `truth/<stem>.txt` (`#HAULING v1`), `truth/regions/<stem>/<region>.txt` (exact region text). |
-| `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI inspector (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`). |
+| `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`, `contract`). OCR behind the `ocr` feature (off by default). |
+| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText` with Paddle, models fetched on first use), `store` (saved list: `<id>.txt` `#HAULING v1` + `<id>.ocr.json` raw text; shots of the same contract merge). |
+| `apps/sc-companion/src/gui/contracts` | Contracts pane: drop box (drag & drop or file dialog), background OCR `worker`, card column, details panel (screenshot preview, OCR text, remove). |
 | `apps/sc-companion/src/gui/map` | Map pane: `camera` (f64 orthographic 2D/3D projection), `scene` (pure what-to-draw + LOD, tested), `paint`, `style`, `inspector`. |
 
 ## Commands
@@ -42,6 +45,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
 cargo run -p sc-companion                                            # GUI
 cargo run -p sc-companion -- --data-dir crates/sc-data/tests/fixtures/scunpacked   # GUI, offline fixture
+cargo run -p sc-companion --release --features ocr                   # GUI with the Contracts OCR
+cargo run -p sc-companion --release --features ocr -- contract samples/05-dead-saints-ruin-grimhex.webp
+cargo run -p sc-companion --release --features ocr -- contract --save samples/09-*.png   # merged into the saved list
 cargo run -p sc-companion -- summary
 cargo run -p sc-companion -- tree stanton --depth 2 --visible-only
 cargo run -p sc-companion -- find "port tresler"
@@ -77,8 +83,8 @@ CI (`.github/workflows/ci.yml`) runs fmt check, clippy `-D warnings` and tests.
 - Tests are offline by default. Network tests are `#[ignore]` with a reason.
 - When changing classification/filters/alias rules, re-check real data with the CLI
   (`summary`, `tree --aliases`, `find`) and keep `docs/data-sources.md` in sync.
-- OCR engines are cargo features, **off by default**, so CI needs no models, ONNX Runtime or
-  Windows APIs. Text interpretation belongs in `sc-contracts`, not in engine adapters. After
+- OCR engines are cargo features, **off by default** (also `sc-companion`'s `ocr`), so CI
+  needs no models, ONNX Runtime or Windows APIs. Text interpretation belongs in `sc-contracts`, not in engine adapters. After
   changing parsing, re-run `run` (cached OCR text is reused, only scoring reruns); after
   changing layout, pipelines or adapters, bump `CACHE_VERSION` in `tools/ocr-bench/src/grid.rs`.
 - Workspace edition 2024, MSRV 1.89 (set by `uuid`).

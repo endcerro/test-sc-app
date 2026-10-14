@@ -18,18 +18,16 @@ all-engines = ["paddle", "ocrs", "winocr", "tesseract"]
 [dependencies]
 sc-contracts.workspace = true
 sc-data.workspace = true
-sc-ocr.workspace = true
+sc-ocr = { workspace = true, features = ["download"] }
 sc-universe.workspace = true
 anyhow.workspace = true
 clap.workspace = true
-directories.workspace = true
 image.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 strsim.workspace = true
-ureq.workspace = true
 
 [lints]
 workspace = true

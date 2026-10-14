@@ -1,18 +1,33 @@
 [package]
 name = "sc-companion"
-description = "Star Citizen companion app: egui GUI (map viewer) plus a CLI to inspect the universe data."
+description = "Star Citizen companion app: egui GUI (map, contracts) plus a CLI to inspect the universe data and read contract screenshots."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+# OCR of contract screenshots (PaddleOCR through ONNX Runtime; models are downloaded on first
+# use). Off by default so CI needs no ONNX Runtime: cargo run -p sc-companion --features ocr
+ocr = ["sc-ocr/paddle", "sc-ocr/download"]
+
 [dependencies]
 sc-universe.workspace = true
 sc-data.workspace = true
+sc-contracts.workspace = true
+sc-ocr.workspace = true
 anyhow.workspace = true
 clap.workspace = true
+directories.workspace = true
 eframe.workspace = true
+image.workspace = true
+rfd = "0.17"
+serde.workspace = true
+serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

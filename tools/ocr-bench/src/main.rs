@@ -17,7 +17,6 @@ mod report;
 mod samples;
 
 use std::collections::BTreeSet;
-use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -25,7 +24,6 @@ use clap::{Parser, Subcommand};
 use sc_data::UniverseSource;
 use sc_ocr::models::{self, ModelDir};
 use sc_ocr::{Layout, Pipeline, Region, crop, layout};
-use sha2::{Digest, Sha256};
 
 use crate::grid::CropMode;
 
@@ -100,7 +98,7 @@ struct RunArgs {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let model_dir = ModelDir::new(cli.models.clone().unwrap_or_else(default_model_dir));
+    let model_dir = ModelDir::new(cli.models.clone().unwrap_or_else(models::default_dir));
     match &cli.command {
         Command::FetchModels => fetch_models(&model_dir),
         Command::Dump { sample, pipeline } => dump(&cli, sample.as_deref(), pipeline),
@@ -109,45 +107,13 @@ fn main() -> Result<()> {
     }
 }
 
-fn default_model_dir() -> PathBuf {
-    directories::ProjectDirs::from("", "", "sc-companion")
-        .map(|d| d.cache_dir().join("models"))
-        .unwrap_or_else(|| std::env::temp_dir().join("sc-companion").join("models"))
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
-}
-
 fn fetch_models(dir: &ModelDir) -> Result<()> {
-    std::fs::create_dir_all(dir.root())?;
     println!("model dir: {}", dir.root().display());
+    models::fetch(dir, models::ALL, |file| {
+        println!("downloading {} ...", file.url);
+    })?;
     for file in models::ALL {
-        let path = dir.path(file);
-        if !path.is_file() {
-            println!("downloading {} ...", file.url);
-            let mut body = Vec::new();
-            ureq::get(file.url)
-                .call()
-                .with_context(|| format!("GET {}", file.url))?
-                .into_body()
-                .with_config()
-                .limit(512 * 1024 * 1024)
-                .reader()
-                .read_to_end(&mut body)?;
-            std::fs::write(&path, &body)?;
-        }
-        let hash = sha256_hex(&std::fs::read(&path)?);
-        if !file.sha256.is_empty() && file.sha256 != hash {
-            bail!(
-                "{}: sha256 {hash} does not match pinned {}",
-                file.name,
-                file.sha256
-            );
-        }
+        let hash = models::sha256_hex(&std::fs::read(dir.path(file))?);
         println!("  {:32} {hash}", file.name);
     }
     Ok(())

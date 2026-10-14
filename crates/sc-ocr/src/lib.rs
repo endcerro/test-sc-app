@@ -3,6 +3,8 @@
 //! - [`layout`]: where the regions of the Contracts screen are, and the objective bullets.
 //! - [`preprocess`]: image pipelines that make the OCR engines' job easier.
 //! - [`engine`]: the [`OcrEngine`] trait and the adapters (each behind a cargo feature).
+//! - [`screen`]: a whole Contracts screenshot read with the recommended settings.
+//! - [`models`]: model files (pinned URLs, download behind the `download` feature).
 //!
 //! Text interpretation (parsing contracts) lives in `sc-contracts`; this crate only turns
 //! pixels into lines of text.
@@ -11,6 +13,7 @@ pub mod engine;
 pub mod layout;
 pub mod models;
 pub mod preprocess;
+pub mod screen;
 
 use std::path::{Path, PathBuf};
 
@@ -20,6 +23,7 @@ use thiserror::Error;
 pub use engine::{OcrEngine, OcrLine, OcrOutput};
 pub use layout::{Bullet, BulletKind, Layout, Rect, Region};
 pub use preprocess::{OcrImage, Pipeline};
+pub use screen::{ScreenText, read_contract_screen, recommended_pipeline};
 
 #[derive(Debug, Error)]
 pub enum OcrError {
@@ -40,6 +44,8 @@ pub enum OcrError {
     Unavailable { engine: String, message: String },
     #[error("{engine} failed: {message}")]
     Engine { engine: String, message: String },
+    #[error("cannot download {file}: {message}")]
+    Download { file: String, message: String },
 }
 
 impl OcrError {

@@ -15,10 +15,15 @@ winocr = ["dep:windows"]
 # Tesseract through its command-line tool (must be installed).
 tesseract = []
 all-engines = ["paddle", "ocrs", "winocr", "tesseract"]
+# models::fetch / default_dir: download the model files (network).
+download = ["dep:directories", "dep:sha2", "dep:ureq"]
 
 [dependencies]
 image.workspace = true
 thiserror.workspace = true
+directories = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
 ocrs = { version = "0.13", optional = true }
 ort = { version = "=2.0.0-rc.14", optional = true }
 rten = { version = "0.26", optional = true }

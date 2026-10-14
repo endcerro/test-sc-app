@@ -20,8 +20,7 @@ use crate::samples::Shot;
 /// Bump when the meaning of a cached result changes (layout, pipelines, adapters).
 const CACHE_VERSION: &str = "v3";
 
-/// Margin around region rectangles, in reference pixels.
-pub const REGION_MARGIN: f64 = 8.0;
+pub use sc_ocr::screen::REGION_MARGIN;
 
 /// How the screenshot is cut before OCR.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -290,10 +289,7 @@ pub fn read_region(
             let processed = pipeline.apply(&crop(img, l.rect(region, REGION_MARGIN)));
             Ok(engine.recognize(&processed)?.text())
         }
-        _ => {
-            let processed = pipeline.apply(&crop(img, anchored.rect(region, REGION_MARGIN)));
-            Ok(engine.recognize(&processed)?.text())
-        }
+        _ => sc_ocr::screen::read_region(img, anchored, pipeline, engine, region),
     }
 }
 

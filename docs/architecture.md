@@ -5,13 +5,14 @@
 ```text
 apps/sc-companion  ──►  sc-data  ──►  sc-universe
       (bin)            (sources,        (model, pure)
-                        cache, http)        ▲
-                                            │ normalize, find_fuzzy
-tools/ocr-bench ──► sc-ocr        sc-contracts
-      (bin)        (pixels → text)  (text → HaulingContract, pure)
+        │               cache, http)        ▲
+        │                                   │ normalize, find_fuzzy
+        └──────────► sc-ocr        sc-contracts ◄── apps/sc-companion
+tools/ocr-bench ──►  (pixels → text)  (text → HaulingContract, pure)
 ```
 
-- **sc-contracts** / **sc-ocr** / **tools/ocr-bench**: contract OCR, see `docs/ocr.md`.
+- **sc-contracts** / **sc-ocr** / **tools/ocr-bench**: contract OCR, see `docs/ocr.md`. The
+  app uses them in `src/contracts/` (reader + saved list) behind its `ocr` feature.
 
 - **sc-universe**: no IO. Owns the model and all algorithms on it (tree queries, distances,
   routing, name lookup). Everything else depends on it.
@@ -81,7 +82,7 @@ Warnings never fail the build; they're returned next to the `Universe`.
 
 ### GUI
 
-`gui/mod.rs` is the shell: a top bar with pane tabs (Map; Trading and OCR are placeholders)
+`gui/mod.rs` is the shell: a top bar with pane tabs (Map, Contracts; Trading is a placeholder)
 and data provenance, a spinner while loading, an error + Retry on failure. Each pane owns its
 side panels and central area.
 
@@ -101,6 +102,14 @@ side panels and central area.
   hidden locations, hollow inherited positions, trading ring, greedy label decluttering.
 - `inspector.rs`: all `Location` fields, amenities, aliases, children, jump links, and the
   distance/route from the focus or a pinned "measure from" location.
+
+**Contracts pane** (`gui/contracts/`, a temporary view: the UI will be redesigned, the
+`contracts` reader/store underneath are meant to stay): a drop box (files dropped anywhere in the window, or a
+file dialog) feeds `worker.rs`, a thread that owns the `ContractReader` and reads one
+screenshot at a time (models downloaded and the engine loaded on the first one). Each result
+is parsed, snapped to the universe and saved through `contracts::ContractStore` (merged into
+an existing entry when title, reward and contractor match), then shown as a card in the
+column. The selected card opens a side panel with the screenshots, raw OCR text and Remove.
 
 ### Name lookup (for OCR)
 
@@ -147,7 +156,6 @@ labels-derived) are resolved against the kept nodes (`scunpacked/aliases.rs`).
 - `sc-data::uex`: terminals + prices, joined onto the universe (see `data-sources.md`).
 - More aliases: UEX terminal names, common abbreviations; map `trade_locations` UUIDs (hauling
   contracts) onto locations.
-- More panes (trading, OCR); map overlays for routes once the optimizer exists.
-- Screen capture + the recommended OCR pipeline (`docs/ocr.md`) in the app; commodity
-  terminal screens; the cargo route optimizer on top of `Universe::route` and
+- Trading pane; map overlays for routes once the optimizer exists.
+- Screen capture (hotkey) instead of dropping screenshot files; commodity terminal screens; the cargo route optimizer on top of `Universe::route` and
   `HaulingContract`.

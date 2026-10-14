@@ -1,9 +1,11 @@
-//! egui/eframe application: a top bar to switch panes, one pane shown at a time.
+//! egui/eframe application: a top bar to switch panes (Map, Contracts), one shown at a time.
 
+mod contracts;
 mod loader;
 mod map;
 
 use anyhow::{Result, anyhow};
+use contracts::ContractsPane;
 use eframe::egui;
 use loader::LoadState;
 use map::MapPane;
@@ -29,23 +31,23 @@ pub fn run(args: SourceArgs) -> Result<()> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pane {
     Map,
+    Contracts,
     Trading,
-    Ocr,
 }
 
 impl Pane {
-    const ALL: [Self; 3] = [Self::Map, Self::Trading, Self::Ocr];
+    const ALL: [Self; 3] = [Self::Map, Self::Contracts, Self::Trading];
 
     fn label(self) -> &'static str {
         match self {
             Self::Map => "Map",
+            Self::Contracts => "Contracts",
             Self::Trading => "Trading",
-            Self::Ocr => "OCR",
         }
     }
 
     fn available(self) -> bool {
-        matches!(self, Self::Map)
+        matches!(self, Self::Map | Self::Contracts)
     }
 }
 
@@ -54,6 +56,7 @@ struct CompanionApp {
     state: LoadState,
     pane: Pane,
     map: Option<MapPane>,
+    contracts: Option<ContractsPane>,
 }
 
 impl CompanionApp {
@@ -65,6 +68,7 @@ impl CompanionApp {
             state,
             pane: Pane::Map,
             map: None,
+            contracts: None,
         }
     }
 
@@ -136,6 +140,15 @@ impl eframe::App for CompanionApp {
             && let LoadState::Ready(data) = &self.state
         {
             self.map = Some(MapPane::new(data.clone()));
+            self.contracts = Some(ContractsPane::new(
+                ctx,
+                data.clone(),
+                self.args.contracts_dir(),
+            ));
+        }
+        // Screenshots dropped on another pane go to the Contracts pane.
+        if self.contracts.is_some() && ctx.input(|i| !i.raw.dropped_files.is_empty()) {
+            self.pane = Pane::Contracts;
         }
 
         self.top_bar(ctx);
@@ -165,14 +178,18 @@ impl eframe::App for CompanionApp {
                     self.state = LoadState::start(&self.args, ctx);
                 }
             }
-            LoadState::Ready(_) => match (self.pane, &mut self.map) {
-                (Pane::Map, Some(map)) => map.show(ctx),
-                _ => {
+            LoadState::Ready(_) => {
+                let shown = match self.pane {
+                    Pane::Map => self.map.as_mut().map(|map| map.show(ctx)),
+                    Pane::Contracts => self.contracts.as_mut().map(|c| c.show(ctx)),
+                    Pane::Trading => None,
+                };
+                if shown.is_none() {
                     egui::CentralPanel::default().show(ctx, |ui| {
                         ui.centered_and_justified(|ui| ui.label("Coming soon"));
                     });
                 }
-            },
+            }
         }
     }
 }
