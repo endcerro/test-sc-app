@@ -281,9 +281,9 @@ cargo run -p sc-companion --release --features ocr -- contract samples/03-redwin
   confidence. On the samples every line was read right and the lowest confidence was 0.859
   (`2h 1m`); reward lines sit near 0.90 because of the currency glyph, so a higher threshold
   would flag correct values.
-- Descriptive places such as `ArcCorp's Yela facility` have no starmap counterpart: they show
-  as unknown until the player types the real place (`ArcCorp Mining Area 157`) and accepts
-  to remember the name.
+- Descriptive places have no starmap counterpart: they show as unknown until the player
+  types the real place and accepts to remember the name, or a curated alias covers them
+  (`ArcCorp's Yela facility` -> `ArcCorp Mining Area 157`, in `sc-data`'s `aliases.json`).
 - `sc-companion contract [--raw] FILE...` prints the `#HAULING` objectives, the flows, the
   checks, fixes and missing/unknown fields (`--raw`: each OCR line with confidence and box).
 - On the samples the app output matches the truth files except that the thin `|` title

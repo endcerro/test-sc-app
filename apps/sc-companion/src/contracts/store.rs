@@ -37,6 +37,8 @@ pub struct Entry {
     /// A screenshot was merged in after the player edited it, so the contract does not
     /// include that screenshot yet (see [`ContractStore::reparse`]).
     pub stale: bool,
+    /// Checked by the player (or read with nothing to check): the board shows it compact.
+    pub done: bool,
 }
 
 impl Entry {
@@ -67,6 +69,7 @@ impl Entry {
         self.confirmed.clear();
         self.edited = false;
         self.stale = false;
+        self.done = false;
     }
 }
 
@@ -248,6 +251,24 @@ impl ContractStore {
                 e.confirmed.push(key);
             }
         })
+    }
+
+    /// Marks the current values of `fields` as checked, without changing them (unlike
+    /// [`Self::edit`], which also clears the "inferred" flag of a place).
+    pub fn confirm(&mut self, id: u64, fields: &[Field]) -> Result<()> {
+        self.modify(id, |e| {
+            for &f in fields {
+                let key = (f.label().to_owned(), fields::text(&e.contract, f));
+                if !key.1.is_empty() && !e.confirmed.contains(&key) {
+                    e.confirmed.push(key);
+                }
+            }
+        })
+    }
+
+    /// Finalizes the entry (compact on the board) or opens it for editing again.
+    pub fn set_done(&mut self, id: u64, done: bool) -> Result<()> {
+        self.modify(id, |e| e.done = done)
     }
 
     /// Ticks or unticks "loaded" on line `k` (not an edit of what was read).
@@ -457,6 +478,8 @@ struct EntryFile {
     edited: bool,
     #[serde(default)]
     stale: bool,
+    #[serde(default)]
+    done: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -560,6 +583,7 @@ impl From<&Entry> for EntryFile {
             confirmed: e.confirmed.clone(),
             edited: e.edited,
             stale: e.stale,
+            done: e.done,
         }
     }
 }
@@ -619,6 +643,7 @@ impl EntryFile {
             confirmed: self.confirmed,
             edited: self.edited,
             stale: self.stale,
+            done: self.done,
         }
     }
 }
@@ -813,6 +838,32 @@ mod tests {
             .add_contract(Contract::default())
             .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(store.entries()[0].id, manual);
+    }
+
+    #[test]
+    fn confirm_and_done() {
+        let dir = temp();
+        let (mut store, _) = ContractStore::open(dir.path());
+        let id = add(&mut store, "06-covalex-wideforest-multidrop").id();
+        store
+            .confirm(
+                id,
+                &[Field::Reward, Field::Pickup(0, 0), Field::Pickup(0, 9)],
+            )
+            .unwrap_or_else(|e| panic!("{e}"));
+        store.set_done(id, true).unwrap_or_else(|e| panic!("{e}"));
+        let e = &store.entries()[0];
+        assert!(!e.edited, "checking is not an edit");
+        assert!(e.done);
+        assert_eq!(e.confirmed.len(), 2, "empty fields are not confirmed");
+        assert_eq!(e.confirmed[0], ("reward".to_owned(), "49,750".to_owned()));
+        assert_eq!(ContractStore::open(dir.path()).0.entries(), store.entries());
+
+        store
+            .reparse(id, &universe())
+            .unwrap_or_else(|e| panic!("{e}"));
+        let e = &store.entries()[0];
+        assert!(!e.done && e.confirmed.is_empty());
     }
 
     #[test]

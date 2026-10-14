@@ -98,7 +98,8 @@ downloaded, loading continues with curated aliases only and a note.
 Embedded at build time. Keyed by starmap UUID (stable across patches), with the expected
 name as a sanity check (mismatch → load note). For names the game data never ties to a
 location: `NB Int. Spaceport` / `New Babbage Interstellar Spaceport` (labels only say
-"*on* microTech"), `Area 18`. The four main spaceports are also listed as a safety net.
+"*on* microTech"), `Area 18`, and mission wording such as `ArcCorp's Yela facility`
+(= `ArcCorp Mining Area 157`, the only ArcCorp site on Yela; hauling sample 09). The four main spaceports are also listed as a safety net.
 Re-check with `sc-companion tree --aliases` after a patch.
 
 ### Not used (yet)

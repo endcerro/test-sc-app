@@ -368,7 +368,7 @@ fn read_contracts(
         if !r.unsure.is_empty() {
             println!("check: {} (low-confidence read)", r.unsure.join(", "));
         }
-        for n in &r.notes {
+        for n in r.notes.iter().chain(&r.cargo) {
             println!("check: {n}");
         }
         for f in &r.fixes {

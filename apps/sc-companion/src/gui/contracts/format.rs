@@ -1,6 +1,7 @@
 //! Text shown on the board (pure, tested; painting is in `card.rs`).
 
 use sc_contracts::truth;
+use sc_universe::normalize;
 
 use crate::contracts::Entry;
 
@@ -28,6 +29,25 @@ pub fn footer(e: &Entry) -> String {
         parts.push("edited".to_owned());
     }
     parts.join(" \u{b7} ")
+}
+
+/// Whether a contract matches what was typed in the search box: every word appears in its
+/// title, contractor, a cargo type or a place (case and accents ignored). Empty matches all.
+pub fn matches(e: &Entry, query: &str) -> bool {
+    let c = &e.contract;
+    let mut haystack: Vec<&str> = [c.title.as_deref(), c.contractor.as_deref()]
+        .into_iter()
+        .flatten()
+        .collect();
+    for f in &c.flows {
+        haystack.push(&f.commodity);
+        haystack.extend(f.pickups.iter().map(|p| p.name.as_str()));
+        haystack.extend(f.dropoffs.iter().map(|d| d.place.name.as_str()));
+    }
+    let text = normalize(&haystack.join(" | "));
+    normalize(query)
+        .split_whitespace()
+        .all(|w| text.contains(w))
 }
 
 /// Unix milliseconds -> `YYYY-MM-DD HH:MM UTC`.
@@ -95,5 +115,39 @@ mod tests {
         e.edited = false;
         assert_eq!(footer(&e), "52 SCU \u{b7} added 1970-01-01 00:00 UTC");
         assert_eq!(money(525_500), "525,500");
+    }
+
+    #[test]
+    fn search() {
+        let e = Entry {
+            contract: Contract {
+                title: Some("Junior Rank - Small Cargo Haul".into()),
+                contractor: Some("Covalex".into()),
+                flows: vec![Flow {
+                    commodity: "Aluminum (Ore)".into(),
+                    pickups: vec![Place::new("Shubin Mining Facility SAL-5")],
+                    dropoffs: vec![DropOff {
+                        place: Place::new("Baijini Point"),
+                        scu: 3,
+                    }],
+                    ..Flow::default()
+                }],
+                ..Contract::default()
+            },
+            ..Entry::default()
+        };
+        for q in [
+            "",
+            "  ",
+            "covalex",
+            "BAIJINI",
+            "sal-5 aluminum",
+            "junior haul",
+        ] {
+            assert!(matches(&e, q), "{q:?}");
+        }
+        for q in ["lorville", "covalex lorville"] {
+            assert!(!matches(&e, q), "{q:?}");
+        }
     }
 }

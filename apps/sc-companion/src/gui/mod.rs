@@ -1,6 +1,7 @@
 //! egui/eframe application: a top bar to switch panes (Map, Contracts, Routes), one shown at
 //! a time.
 
+mod contract_view;
 mod contracts;
 mod loader;
 mod map;

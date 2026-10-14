@@ -3,6 +3,10 @@
 //! review each contract as a card, checking doubtful fields against the pixels they were
 //! read from. Contracts also arrive from the in-game capture hotkey ([`hotkey`]). `#N` is
 //! the Nth oldest contract; the board shows them newest or oldest first (a saved toggle).
+//!
+//! A card is edited until the player presses Done (contracts read with nothing to check
+//! are done at once); done cards are compact. Any card folds to its header line (saved),
+//! and the board filters by status and searches.
 
 mod card;
 mod format;
@@ -27,7 +31,7 @@ use crate::contracts::fields::{self, Field};
 use crate::contracts::places::{PlaceTree, Places};
 use crate::contracts::prefs::BoardPrefs;
 use crate::contracts::reader::{EXTENSIONS, NO_OCR, file_name, is_screenshot};
-use crate::contracts::review::{self, Lookup, Mark, Review};
+use crate::contracts::review::{self, Lookup, Mark, Review, Status};
 use crate::contracts::store::Added;
 use crate::contracts::{ContractReader, ContractStore, Entry, ShotText};
 use crate::gui::theme;
@@ -69,6 +73,30 @@ pub struct View {
     pub new_pickup: HashSet<(u64, usize)>,
     pub new_dropoff: HashSet<(u64, usize)>,
     pub confirm_remove: Option<u64>,
+    pub filter: Filter,
+    pub search: String,
+    /// The import / export text box is open.
+    pub text_open: bool,
+}
+
+/// Which contracts the board shows.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Filter {
+    #[default]
+    All,
+    /// Anything to check or fix.
+    ToCheck,
+    Ready,
+}
+
+impl Filter {
+    fn keeps(self, s: Status) -> bool {
+        match self {
+            Self::All => true,
+            Self::ToCheck => s != Status::Ready,
+            Self::Ready => s == Status::Ready,
+        }
+    }
 }
 
 /// Changes collected while drawing, applied afterwards.
@@ -82,6 +110,13 @@ pub enum Edit {
     Loaded(u64, usize, bool),
     ToggleShot(u64),
     Reparse(u64),
+    /// The values read right (right-click, a ticked chip, "Accept all").
+    Confirm(u64, Vec<Field>),
+    /// Done: accept the doubtful reads and show it compact.
+    Finish(u64),
+    /// Edit a done contract again.
+    Reopen(u64),
+    ToggleCollapsed(u64),
 }
 
 /// The review of an entry, kept until the entry changes.
@@ -89,6 +124,9 @@ pub struct Reviewed {
     entry: Entry,
     pub marks: HashMap<Field, Mark>,
     pub review: Review,
+    pub status: Status,
+    /// Doubtful reads, in reading order (see [`review::unsure`]).
+    pub unsure: Vec<Field>,
 }
 
 pub struct ContractsPane {
@@ -285,6 +323,7 @@ impl ContractsPane {
             }
         };
         let id = added.id();
+        self.finalize_if_ready(id);
         let Some(e) = self.store.get(id) else {
             return;
         };
@@ -351,6 +390,8 @@ impl ContractsPane {
                     entry: e.clone(),
                     marks,
                     review: review::review(e, lk),
+                    status: review::status(e, lk),
+                    unsure: review::unsure(e, lk),
                 },
             );
         }
@@ -386,7 +427,7 @@ impl ContractsPane {
                 continue;
             };
             for f in fields::all(&e.contract) {
-                if r.marks.get(&f).is_some_and(|m| *m != Mark::None) {
+                if r.marks.get(&f).is_some_and(|m| *m != Mark::None) || r.unsure.contains(&f) {
                     out.push((e.id, f));
                 }
             }
@@ -412,75 +453,43 @@ impl ContractsPane {
         self.remember_box(ui);
         self.taught_names(ui);
 
-        ui.add_space(4.0);
-        let entries = self.board_entries();
-        let scu: u32 = entries.iter().map(|e| e.contract.total_scu()).sum();
-        let reward: u64 = entries.iter().filter_map(|e| e.contract.reward).sum();
-        let count = entries.len();
-        let saved_in = format!("Saved in {}", self.store.dir().display());
-        ui.horizontal(|ui| {
-            ui.heading(RichText::new("Contracts").size(15.0).strong())
-                .on_hover_text(saved_in);
-            ui.label(
-                RichText::new(format!(
-                    "{count} contracts \u{b7} {scu} SCU \u{b7} {} aUEC",
-                    format::money(reward)
-                ))
-                .color(theme::MUTED)
-                .size(13.0),
-            );
-        });
+        ui.add_space(6.0);
+        self.summary(ui);
         let to_check = self.to_check();
-        let mut go_next = next_key;
-        ui.horizontal(|ui| {
-            if small_button(ui, "Add contract").clicked() {
-                let contract = Contract {
-                    title: Some("New contract".into()),
-                    flows: vec![Flow::default()],
-                    ..Contract::default()
-                };
-                if let Err(e) = self.store.add_contract(contract) {
-                    self.error = Some(format!("Couldn't save: {e:#}"));
-                }
-            }
-            if small_button(ui, "Export as text").clicked() {
-                let objectives: Vec<_> = self
-                    .board_entries()
-                    .iter()
-                    .map(|e| e.contract.to_objectives())
-                    .collect();
-                self.paste = board_text::write(&objectives);
-            }
-            let order = if self.prefs.newest_first {
-                "Newest first"
-            } else {
-                "Oldest first"
-            };
-            if small_button(ui, order)
-                .on_hover_text("Order of the list (numbers stay by age)")
-                .clicked()
-            {
-                self.prefs.newest_first = !self.prefs.newest_first;
-                if let Err(e) = self.prefs.save(self.store.dir()) {
-                    self.error = Some(format!("Couldn't save: {e:#}"));
-                }
-            }
-            self.clear_button(ui, count);
-            let label = format!("Next to check ({}) \u{b7} F8", to_check.len());
-            let button = egui::Button::new(RichText::new(label).size(13.0).color(theme::WARN));
-            if ui.add_enabled(!to_check.is_empty(), button).clicked() {
-                go_next = true;
-            }
-        });
+        let go_next = self.toolbar(ui, &to_check) || next_key;
         if go_next {
             let focus = self.view.focus.and_then(|f| self.board_order(f));
             let after = |x: &&(u64, Field)| match (focus, self.board_order(**x)) {
                 (Some(f), Some(o)) => o > f,
                 _ => false,
             };
-            self.view.goto = to_check.iter().find(after).or(to_check.first()).copied();
+            let target = to_check.iter().find(after).or(to_check.first()).copied();
+            if let Some((id, _)) = target {
+                // The field is in the editor of an unfolded card.
+                self.set_collapsed(id, false);
+                if self.store.get(id).is_some_and(|e| e.done) {
+                    self.apply(Edit::Reopen(id));
+                }
+                if self
+                    .reviews
+                    .get(&id)
+                    .is_some_and(|r| !self.view.filter.keeps(r.status))
+                {
+                    self.view.filter = Filter::All;
+                }
+                if self
+                    .store
+                    .get(id)
+                    .is_some_and(|e| !format::matches(e, &self.view.search))
+                {
+                    self.view.search.clear();
+                }
+            }
+            self.view.goto = target;
         }
+        ui.add_space(4.0);
 
+        let count = self.store.entries().len();
         if count == 0 {
             egui::Frame::new()
                 .stroke(Stroke::new(1.0_f32, theme::LINE))
@@ -503,6 +512,7 @@ impl ContractsPane {
         let mut focused = None;
         let ids: Vec<u64> = self.board_entries().iter().map(|e| e.id).collect();
         let shown: Vec<u64> = self.shown_entries().iter().map(|e| e.id).collect();
+        let mut hidden = 0;
         for id in &shown {
             let Some(i) = ids.iter().position(|x| x == id) else {
                 continue;
@@ -510,6 +520,12 @@ impl ContractsPane {
             let (Some(entry), Some(reviewed)) = (self.store.get(*id), self.reviews.get(id)) else {
                 continue;
             };
+            if !self.view.filter.keeps(reviewed.status)
+                || !format::matches(entry, &self.view.search)
+            {
+                hidden += 1;
+                continue;
+            }
             let dups: Vec<usize> = duplicates
                 .iter()
                 .filter_map(|&(a, b)| match (a == *id, b == *id) {
@@ -530,14 +546,162 @@ impl ContractsPane {
                 edits: &mut edits,
                 focused: &mut focused,
                 duplicates: dups,
+                collapsed: self.prefs.collapsed.contains(id),
             };
             card::show(ui, &mut cx);
             ui.add_space(6.0);
+        }
+        if hidden > 0 {
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "{hidden} contract{} hidden by the filter",
+                        if hidden == 1 { "" } else { "s" }
+                    ))
+                    .color(theme::MUTED)
+                    .size(13.0),
+                );
+                if ui.link("Show all").clicked() {
+                    self.view.filter = Filter::All;
+                    self.view.search.clear();
+                }
+            });
         }
         self.view.focus = focused;
         for e in edits {
             self.apply(e);
         }
+    }
+
+    /// `Contracts  5 · 120 SCU · 412,000 aUEC   3 ready · 1 to check · 1 to fix`.
+    fn summary(&self, ui: &mut Ui) {
+        let entries = self.board_entries();
+        let scu: u32 = entries.iter().map(|e| e.contract.total_scu()).sum();
+        let reward: u64 = entries.iter().filter_map(|e| e.contract.reward).sum();
+        let mut counts = [0usize; 3];
+        for r in self.reviews.values() {
+            counts[match r.status {
+                Status::Ready => 0,
+                Status::ToCheck(_) => 1,
+                Status::Blocked(_) => 2,
+            }] += 1;
+        }
+        let saved_in = format!("Saved in {}", self.store.dir().display());
+        ui.horizontal(|ui| {
+            ui.heading(RichText::new("Contracts").size(16.0).strong())
+                .on_hover_text(saved_in);
+            ui.label(
+                RichText::new(entries.len().to_string())
+                    .strong()
+                    .color(theme::TEXT),
+            );
+            ui.label(RichText::new("\u{b7}").color(theme::MUTED));
+            ui.label(RichText::new(format!("{scu} SCU")).color(theme::CARGO));
+            ui.label(RichText::new("\u{b7}").color(theme::MUTED));
+            ui.label(RichText::new(format!("{} aUEC", format::money(reward))).color(theme::REWARD));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                for (n, text, color) in [
+                    (counts[2], "to fix", theme::BAD),
+                    (counts[1], "to check", theme::WARN),
+                    (counts[0], "ready", theme::GOOD),
+                ] {
+                    if n > 0 {
+                        ui.label(RichText::new(format!("{n} {text}")).color(color).size(13.0));
+                    }
+                }
+            });
+        });
+    }
+
+    /// Add, import/export, filter, search, fold, order, clear and "Next to check". Returns
+    /// whether "Next to check" was clicked.
+    fn toolbar(&mut self, ui: &mut Ui, to_check: &[(u64, Field)]) -> bool {
+        let mut go_next = false;
+        ui.horizontal_wrapped(|ui| {
+            if small_button(ui, "Add contract").clicked() {
+                let contract = Contract {
+                    title: Some("New contract".into()),
+                    flows: vec![Flow::default()],
+                    ..Contract::default()
+                };
+                if let Err(e) = self.store.add_contract(contract) {
+                    self.error = Some(format!("Couldn't save: {e:#}"));
+                }
+            }
+            if ui
+                .add(egui::Button::selectable(
+                    self.view.text_open,
+                    RichText::new("Text").size(13.0),
+                ))
+                .on_hover_text("Paste #HAULING v1 text, or export the list as text")
+                .clicked()
+            {
+                self.view.text_open = !self.view.text_open;
+            }
+            ui.separator();
+            for (f, label) in [
+                (Filter::All, "All"),
+                (Filter::ToCheck, "To check"),
+                (Filter::Ready, "Ready"),
+            ] {
+                let on = self.view.filter == f;
+                if ui
+                    .add(egui::Button::selectable(
+                        on,
+                        RichText::new(label).size(13.0),
+                    ))
+                    .clicked()
+                {
+                    self.view.filter = f;
+                }
+            }
+            ui.add(
+                TextEdit::singleline(&mut self.view.search)
+                    .hint_text("Search title, cargo, place")
+                    .desired_width(190.0),
+            );
+            if !self.view.search.is_empty() && widgets::remove_button(ui, "Clear the search") {
+                self.view.search.clear();
+            }
+            ui.separator();
+            let shown: Vec<u64> = self.shown_entries().iter().map(|e| e.id).collect();
+            let all_folded =
+                !shown.is_empty() && shown.iter().all(|id| self.prefs.collapsed.contains(id));
+            let fold = if all_folded { "Unfold all" } else { "Fold all" };
+            if ui
+                .add_enabled(
+                    !shown.is_empty(),
+                    egui::Button::new(RichText::new(fold).size(13.0)),
+                )
+                .clicked()
+            {
+                if all_folded {
+                    self.prefs.collapsed.clear();
+                } else {
+                    self.prefs.collapsed.extend(shown);
+                }
+                self.save_prefs();
+            }
+            let order = if self.prefs.newest_first {
+                "Newest first"
+            } else {
+                "Oldest first"
+            };
+            if small_button(ui, order)
+                .on_hover_text("Order of the list (numbers stay by age)")
+                .clicked()
+            {
+                self.prefs.newest_first = !self.prefs.newest_first;
+                self.save_prefs();
+            }
+            self.clear_button(ui, self.store.entries().len());
+            let label = format!("Next to check ({}) \u{b7} F8", to_check.len());
+            let button = egui::Button::new(RichText::new(label).size(13.0).color(theme::WARN));
+            if ui.add_enabled(!to_check.is_empty(), button).clicked() {
+                go_next = true;
+            }
+        });
+        go_next
     }
 
     fn clear_button(&mut self, ui: &mut Ui, count: usize) {
@@ -560,6 +724,7 @@ impl ContractsPane {
             if let Err(e) = self.store.clear() {
                 self.error = Some(format!("Could not remove every contract: {e:#}"));
             }
+            self.prune_collapsed();
         }
         if small_button(ui, "Cancel").clicked() {
             self.confirm_clear = false;
@@ -579,6 +744,8 @@ impl ContractsPane {
             return;
         };
         let hovering = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
+        // One line once there are contracts; full size while files hover.
+        let compact = !hovering && !self.store.entries().is_empty();
         let (stroke, fill) = if hovering {
             (
                 Stroke::new(2.0_f32, theme::ACCENT),
@@ -593,9 +760,30 @@ impl ContractsPane {
             .stroke(stroke)
             .fill(fill)
             .corner_radius(theme::RADIUS)
-            .inner_margin(14)
+            .inner_margin(if compact { 8 } else { 14 })
             .show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
+                if compact {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Drop contract screenshots here").strong());
+                        let mut more = "or click to browse".to_owned();
+                        if has_hotkey {
+                            more.push_str(&format!(" \u{b7} {} in game", hotkey::LABEL));
+                        }
+                        ui.label(RichText::new(more).color(theme::MUTED).size(12.5));
+                        if pending > 0 {
+                            ui.spinner();
+                            ui.label(status.as_deref().unwrap_or("Waiting..."));
+                            if pending > 1 {
+                                ui.label(
+                                    RichText::new(format!("({} queued)", pending - 1))
+                                        .color(theme::MUTED),
+                                );
+                            }
+                        }
+                    });
+                    return;
+                }
                 ui.vertical_centered(|ui| {
                     let text = if hovering {
                         "Release to read the screenshots"
@@ -649,6 +837,9 @@ impl ContractsPane {
     }
 
     fn paste_box(&mut self, ui: &mut Ui) {
+        if !self.view.text_open && self.issues.is_empty() {
+            return;
+        }
         theme::card().show(ui, |ui| {
             ui.add(
                 TextEdit::multiline(&mut self.paste)
@@ -684,6 +875,18 @@ impl ContractsPane {
                 );
                 if ui.link("Insert example").clicked() {
                     EXAMPLE.clone_into(&mut self.paste);
+                }
+                if ui.link("Export the list").clicked() {
+                    let objectives: Vec<_> = self
+                        .board_entries()
+                        .iter()
+                        .map(|e| e.contract.to_objectives())
+                        .collect();
+                    self.paste = board_text::write(&objectives);
+                }
+                if ui.link("Close").clicked() {
+                    self.view.text_open = false;
+                    self.issues.clear();
                 }
             });
         });
@@ -844,6 +1047,47 @@ impl ContractsPane {
         }
     }
 
+    /// Shows a contract compact when nothing is left to check, in the editor otherwise
+    /// (after a read or a re-parse).
+    fn finalize_if_ready(&mut self, id: u64) {
+        let Some(e) = self.store.get(id) else {
+            return;
+        };
+        let ready = review::status(e, self.lookup()) == Status::Ready;
+        if e.done != ready
+            && let Err(e) = self.store.set_done(id, ready)
+        {
+            self.error = Some(format!("Couldn't save the contract: {e:#}"));
+        }
+    }
+
+    fn set_collapsed(&mut self, id: u64, fold: bool) {
+        let changed = if fold {
+            self.prefs.collapsed.insert(id)
+        } else {
+            self.prefs.collapsed.remove(&id)
+        };
+        if changed {
+            self.save_prefs();
+        }
+    }
+
+    /// Forgets the folds of removed contracts.
+    fn prune_collapsed(&mut self) {
+        let store = &self.store;
+        let before = self.prefs.collapsed.len();
+        self.prefs.collapsed.retain(|id| store.get(*id).is_some());
+        if self.prefs.collapsed.len() != before {
+            self.save_prefs();
+        }
+    }
+
+    fn save_prefs(&mut self) {
+        if let Err(e) = self.prefs.save(self.store.dir()) {
+            self.error = Some(format!("Couldn't save: {e:#}"));
+        }
+    }
+
     fn apply(&mut self, edit: Edit) {
         let result = match edit {
             Edit::Set(id, f, value) => {
@@ -861,7 +1105,9 @@ impl ContractsPane {
             Edit::RemoveContract(id) => {
                 self.view.confirm_remove = None;
                 self.view.open_shots.remove(&id);
-                self.store.remove(id)
+                let r = self.store.remove(id);
+                self.prune_collapsed();
+                r
             }
             Edit::AddLine(id) => self.store.add_line(id),
             Edit::RemoveLine(id, k) => {
@@ -883,7 +1129,31 @@ impl ContractsPane {
                 }
                 Ok(())
             }
-            Edit::Reparse(id) => self.store.reparse(id, &self.data.universe),
+            Edit::Reparse(id) => {
+                let r = self.store.reparse(id, &self.data.universe);
+                self.finalize_if_ready(id);
+                r
+            }
+            Edit::Confirm(id, fields) => self.store.confirm(id, &fields),
+            Edit::Finish(id) => {
+                let unsure = self
+                    .store
+                    .get(id)
+                    .map(|e| review::unsure(e, self.lookup()))
+                    .unwrap_or_default();
+                self.store
+                    .confirm(id, &unsure)
+                    .and_then(|()| self.store.set_done(id, true))
+            }
+            Edit::Reopen(id) => {
+                self.set_collapsed(id, false);
+                self.store.set_done(id, false)
+            }
+            Edit::ToggleCollapsed(id) => {
+                let fold = !self.prefs.collapsed.contains(&id);
+                self.set_collapsed(id, fold);
+                Ok(())
+            }
         };
         if let Err(e) = result {
             self.error = Some(format!("Couldn't save the contract: {e:#}"));

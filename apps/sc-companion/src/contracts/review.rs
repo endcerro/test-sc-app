@@ -50,6 +50,8 @@ pub struct Review {
     pub unsure: Vec<String>,
     /// Other things worth a look (amber).
     pub notes: Vec<String>,
+    /// Cargo types snapping changed: `Gold cargo, read "Gald"` (amber).
+    pub cargo: Vec<String>,
     pub fixes: Vec<Fix>,
 }
 
@@ -185,7 +187,7 @@ pub fn review(e: &Entry, lk: Lookup) -> Review {
             .enumerate()
             .any(|(k, f)| f.commodity == read.known && confirmed(e, Field::Commodity(k)));
         if shown && !ok {
-            r.notes.push(format!(
+            r.cargo.push(format!(
                 "{} cargo, read \u{201c}{}\u{201d}",
                 read.known, read.read
             ));
@@ -199,6 +201,55 @@ pub fn review(e: &Entry, lk: Lookup) -> Review {
         );
     }
     r
+}
+
+/// Where a contract stands, for its badge on the board.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    /// Nothing to check.
+    Ready,
+    /// This many doubtful reads (amber), nothing blocking.
+    ToCheck(usize),
+    /// This many problems or missing/unknown values (red): planning skips or misplans it.
+    Blocked(usize),
+}
+
+pub fn status(e: &Entry, lk: Lookup) -> Status {
+    let bad = fields::all(&e.contract)
+        .into_iter()
+        .filter(|&f| mark(e, f, lk) == Mark::Bad)
+        .count()
+        + review(e, lk).problems.len();
+    let check = unsure(e, lk).len() + usize::from(e.stale);
+    match (bad, check) {
+        (0, 0) => Status::Ready,
+        (0, n) => Status::ToCheck(n),
+        (n, _) => Status::Blocked(n),
+    }
+}
+
+/// The doubtful reads of a contract, in reading order: amber fields and cargo types that
+/// snapping changed. Confirming them all ("Done") leaves nothing to check but red problems
+/// and a stale merge.
+pub fn unsure(e: &Entry, lk: Lookup) -> Vec<Field> {
+    fields::all(&e.contract)
+        .into_iter()
+        .filter(|&f| match f {
+            Field::Commodity(k) => snapped_cargo(e, k),
+            _ => mark(e, f, lk) == Mark::Unsure,
+        })
+        .collect()
+}
+
+/// Whether the cargo type of line `k` was changed by snapping and not confirmed since.
+fn snapped_cargo(e: &Entry, k: usize) -> bool {
+    let Some(flow) = e.contract.flows.get(k) else {
+        return false;
+    };
+    e.reads
+        .iter()
+        .any(|r| r.kind == ReadKind::Commodity && r.known == flow.commodity)
+        && !confirmed(e, Field::Commodity(k))
 }
 
 /// Every field still needing the player, in board order then reading order.
@@ -349,7 +400,7 @@ mod tests {
             known: "Gold".into(),
         });
         assert_eq!(
-            review(&e, lk).notes,
+            review(&e, lk).cargo,
             ["Gold cargo, read \u{201c}Gald\u{201d}"]
         );
     }
@@ -404,6 +455,75 @@ mod tests {
         let src = sources::locate(&e, Field::Reward);
         assert_eq!(src.map(|s| (s.region, s.y)), Some((Region::Reward, 0)));
         assert_eq!(mark(&e, Field::Reward, lk), Mark::None);
+    }
+
+    #[test]
+    fn statuses() {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../crates/sc-data/tests/fixtures/scunpacked");
+        use sc_data::UniverseSource;
+        let u = sc_data::ScunpackedSource::from_dir(dir)
+            .load()
+            .unwrap_or_else(|e| panic!("{e}"))
+            .universe;
+        let places = Places::new(&u, &BTreeMap::new());
+        let lk = Lookup {
+            universe: &u,
+            places: &places,
+        };
+        let mut e = entry(Place::new("Lorville"), "Area18", 4);
+        assert_eq!(status(&e, lk), Status::Ready);
+
+        e.reads.push(Read {
+            kind: ReadKind::Commodity,
+            read: "Gald".into(),
+            known: "Gold".into(),
+        });
+        e.stale = true;
+        assert_eq!(unsure(&e, lk), [Field::Commodity(0)]);
+        assert_eq!(status(&e, lk), Status::ToCheck(2));
+        e.confirmed.push(("cargo".into(), "Gold".into()));
+        e.stale = false;
+        assert_eq!(status(&e, lk), Status::Ready);
+
+        e.contract.reward = None;
+        e.contract.flows[0].pickups[0] = Place::new("Nowhere Yard");
+        assert_eq!(
+            status(&e, lk),
+            Status::Blocked(3),
+            "unknown place, reward + problem"
+        );
+    }
+
+    #[test]
+    fn unsure_fields_until_confirmed() {
+        let u = empty();
+        let places = Places::new(&u, &BTreeMap::new());
+        let lk = Lookup {
+            universe: &u,
+            places: &places,
+        };
+        // Places are unknown (red) in an empty universe: never "unsure", never confirmed away.
+        let mut e = entry(Place::uncertain("A"), "B", 4);
+        e.shots = vec![ShotText {
+            title: "Haul".into(),
+            boxes: ShotBoxes {
+                title: vec![Some(LineBox {
+                    x: 0,
+                    y: 0,
+                    w: 10,
+                    h: 10,
+                    conf: Some(0.5),
+                })],
+                ..ShotBoxes::default()
+            },
+            ..ShotText::default()
+        }];
+        assert_eq!(unsure(&e, lk), [Field::Title]);
+        e.confirmed.push(("title".into(), "Haul".into()));
+        e.confirmed.push(("pickup".into(), "A".into()));
+        assert!(unsure(&e, lk).is_empty());
+        assert_eq!(mark(&e, Field::Pickup(0, 0), lk), Mark::Bad);
     }
 
     #[test]

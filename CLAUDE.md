@@ -35,11 +35,12 @@ file schemas, quirks) before changing the data layer, and `docs/ocr.md` before c
 | `tools/ocr-bench` | OCR benchmark: grid over engines x pipelines x crop modes, result cache, CER + end-to-end scoring, `summary.md` reports. Engines are opt-in features. |
 | `samples/` | Contract screenshots, `truth/<stem>.txt` (`#HAULING v1`), `truth/regions/<stem>/<region>.txt` (exact region text). |
 | `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`, `contract`). OCR behind the `ocr` feature (off by default). |
-| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText`: text + line boxes, Paddle, models fetched on first use), `parse` (flows + snapping corrections), `fields` (`Field`: text/set of every editable value), `sources` (screenshot box a value was read from), `places` (place tree, suggestions, fixes, taught names), `review` (field marks, problems, next to check, duplicates), `board_text` (`#HAULING v1` import/export), `capture` (hotkey screen grab -> `shots/<ms>.png`, Windows via `xcap`), `prefs` (`board.json`: list order), `store` (`<id>.json` per contract + `place_names.json`; shots of the same contract merge; old `.txt` stores converted). |
+| `apps/sc-companion/src/contracts` | No egui: `reader` (screenshot -> `ShotText`: text + line boxes, Paddle, models fetched on first use), `parse` (flows + snapping corrections), `fields` (`Field`: text/set of every editable value), `sources` (screenshot box a value was read from), `places` (place tree, suggestions, fixes, taught names), `review` (field marks, problems, next to check, duplicates), `board_text` (`#HAULING v1` import/export), `capture` (hotkey screen grab -> `shots/<ms>.png`, Windows via `xcap`), `prefs` (`board.json`: list order, folded cards), `store` (`<id>.json` per contract + `place_names.json`; shots of the same contract merge; old `.txt` stores converted). |
 | `apps/sc-companion/src/routes.rs` | No egui: `RouteSetup` (ships + planning settings) saved as `planner.json` in the contracts dir. |
 | `apps/sc-companion/src/gui/routes` | Routes pane (ported from the hauling planner): setup bar (ship, start place, times, goal), planning thread, route cards (trip strip, cargo strip, stop table), "Not in the top route". |
 | `apps/sc-companion/src/gui/widgets.rs` | Widgets shared by the Contracts and Routes panes (buffered fields, place autocomplete, buttons, badge). |
-| `apps/sc-companion/src/gui/contracts` | Contracts pane (temporary view, ported from the hauling planner's board): drop box + paste/export box, background OCR `worker`, `hotkey` (Ctrl+Shift+C polled with `GetAsyncKeyState` via `device_query`, works while the game has focus), newest/oldest-first toggle (`#N` stays by age), `card` per contract, source crops, Next to check (F8). |
+| `apps/sc-companion/src/gui/contracts` | Contracts pane (temporary view, ported from the hauling planner's board): drop box + paste/export box, background OCR `worker`, `hotkey` (Ctrl+Shift+C polled with `GetAsyncKeyState` via `device_query`, works while the game has focus), newest/oldest-first toggle (`#N` stays by age), status filter + search, fold/unfold (saved), `card` per contract: editor until Done (clean reads are done at once), then compact; right-click an amber field to mark it checked; source crops, Next to check (F8). |
+| `apps/sc-companion/src/gui/contract_view.rs` | Compact read-only contract (header line with status badge, cargo-line summary); only needs a `Contract` + place lookup, meant for reuse by other panes. |
 | `apps/sc-companion/src/gui/theme.rs` | App theme (planner palette, Segoe UI + Segoe UI Symbol on Windows; `theme::sym` falls back to plain text without them). |
 | `apps/sc-companion/src/gui/map` | Map pane: `camera` (f64 orthographic 2D/3D projection), `scene` (pure what-to-draw + LOD, tested), `paint`, `style`, `inspector`. |
 
@@ -119,6 +120,12 @@ CI (`.github/workflows/ci.yml`) runs fmt check, clippy `-D warnings` and tests.
   `Pyro V` in game data, surface coordinates ignore planet rotation.
 
 ## Environment notes
+
+On this Windows machine (Git Bash), do not pass multi-line scripts or file contents through
+bash heredocs (`python - <<'EOF'`, `cat <<EOF`): large ones fail with "unexpected EOF while
+looking for matching `''" (Rust sources are full of quotes and `\u{..}` escapes). Use the
+Edit/Write tools for code changes; for bulk or scripted edits, Write the script (and any
+code it inserts) to a file in the scratchpad, then run it (`python <scratchpad>/edit.py`).
 
 In Claude Code web sessions, `api.github.com` is not reachable, so the revision is resolved via
 git smart HTTP and the game version shows as "unknown"; `raw.githubusercontent.com` and

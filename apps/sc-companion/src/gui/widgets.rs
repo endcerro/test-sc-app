@@ -162,6 +162,9 @@ pub fn place_tree(ui: &mut Ui, tree: &PlaceTree, width: f32) {
 /// How many places a place field lists.
 pub const PLACE_CHOICES: usize = 8;
 
+/// Tallest the list of places under a place field gets (it scrolls past that).
+const PICK_MAX_H: f32 = 220.0;
+
 /// Offers places for what's typed: (name, system), best first.
 pub type Suggest<'a> = &'a dyn Fn(&str) -> Vec<(String, String)>;
 
@@ -209,6 +212,7 @@ pub fn place(
         return out;
     }
     let mut highlight = highlight.filter(|&h| h < matches.len());
+    let mut moved = false;
     if out.response.has_focus() {
         let (down, up) = ui.input(|i| (i.key_pressed(Key::ArrowDown), i.key_pressed(Key::ArrowUp)));
         if down {
@@ -216,23 +220,39 @@ pub fn place(
         } else if up {
             highlight = highlight.and_then(|h| h.checked_sub(1));
         }
+        moved = down || up;
     }
+    // At most PICK_MAX_H tall, and never past the bottom of the window: the rest scrolls.
+    let top = out.response.rect.bottom() + 2.0;
+    let room = ui.ctx().content_rect().bottom() - top - 12.0;
+    let max_h = PICK_MAX_H.min(room).max(60.0);
     let area = egui::Area::new(pick_id)
         .order(egui::Order::Foreground)
         .fixed_pos(out.response.rect.left_bottom() + egui::vec2(0.0, 2.0))
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_min_width(width.max(220.0));
-                for (n, (name, system)) in matches.iter().enumerate() {
-                    let button =
-                        egui::Button::new(RichText::new(format!("{name}  ")).color(theme::TEXT))
-                            .frame(highlight == Some(n))
-                            .selected(highlight == Some(n))
+                egui::ScrollArea::vertical()
+                    .id_salt(pick_id.with("scroll"))
+                    .max_height(max_h)
+                    .show(ui, |ui| {
+                        for (n, (name, system)) in matches.iter().enumerate() {
+                            let on = highlight == Some(n);
+                            let button = egui::Button::new(
+                                RichText::new(format!("{name}  ")).color(theme::TEXT),
+                            )
+                            .frame(on)
+                            .selected(on)
                             .right_text(RichText::new(system).color(theme::MUTED).small());
-                    if ui.add(button).clicked() {
-                        out.commit = Some(name.clone());
-                    }
-                }
+                            let r = ui.add(button);
+                            if on && moved {
+                                r.scroll_to_me(None);
+                            }
+                            if r.clicked() {
+                                out.commit = Some(name.clone());
+                            }
+                        }
+                    });
             })
         });
     let hovered = area.response.contains_pointer();

@@ -24,6 +24,12 @@
       "target_name": "New Babbage",
       "alt_names": [],
       "venues": ["NB Int. Spaceport", "New Babbage Interstellar Spaceport"]
+    },
+    {
+      "target": "458d5f25-d74f-461f-ae8f-ea7358f9fc78",
+      "target_name": "ArcCorp Mining Area 157",
+      "alt_names": [],
+      "venues": ["ArcCorp's Yela facility"]
     }
   ]
 }
