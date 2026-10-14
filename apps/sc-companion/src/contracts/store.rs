@@ -1,19 +1,17 @@
-//! The saved contract list: one entry per contract, two files each in the store directory.
+//! The saved contract list: one `<id>.json` per contract in the store directory, holding the
+//! contract as flows (with the player's edits and loaded flags), the OCR corrections and the
+//! raw OCR text of every screenshot (so it can be re-parsed, and scrolled shots merged).
 //!
-//! - `<id>.txt`: the contract in the `#HAULING v1` truth format, plus `# source: <path>`
-//!   comments. Human readable; edits are picked up at the next launch (but replaced if a new
-//!   screenshot of the same contract is merged in, since that re-parses the OCR text).
-//! - `<id>.ocr.json`: the raw OCR text of every screenshot ([`ShotText`]), so scrolled shots
-//!   can be merged later and contracts re-parsed.
-//!
-//! `id` is the time the contract was added, in Unix milliseconds.
+//! `id` is the time the contract was added, in Unix milliseconds. Stores written by the
+//! first version (`<id>.txt` in `#HAULING v1` + `<id>.ocr.json`) are converted on open.
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result};
-use sc_contracts::{HaulingContract, truth};
-use sc_universe::Universe;
+use anyhow::{Context, Result, bail};
+use sc_contracts::{Contract, DropOff, Flow, Place, truth};
+use sc_universe::{Universe, normalize};
+use serde::{Deserialize, Serialize};
 
 use super::{ShotText, parse};
 
@@ -21,26 +19,63 @@ use super::{ShotText, parse};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     pub id: u64,
-    pub contract: HaulingContract,
-    /// Screenshots it was read from, in the order they were added. Empty when the OCR file
-    /// is missing (e.g. a hand-written `.txt`).
+    pub contract: Contract,
+    /// Screenshots it was read from, in the order they were added. Empty for imported
+    /// contracts without OCR text.
     pub shots: Vec<ShotText>,
+    /// Names the parser corrected when reading the screenshots (see `contracts::parse`).
+    pub corrections: Vec<String>,
+    /// Changed by the player since it was parsed.
+    pub edited: bool,
+    /// A screenshot was merged in after the player edited it, so the contract does not
+    /// include that screenshot yet (see [`ContractStore::reparse`]).
+    pub stale: bool,
 }
 
 impl Entry {
-    pub fn sources(&self) -> impl Iterator<Item = &Path> {
-        self.shots.iter().filter_map(|s| s.source.as_deref())
-    }
-
     /// Whether a newly read contract is this one again: a scrolled continuation or a
     /// re-capture. Needs a title, and the same title, reward and contractor.
-    fn same_contract(&self, other: &HaulingContract) -> bool {
+    fn same_contract(&self, other: &Contract) -> bool {
         let c = &self.contract;
         c.title.is_some()
             && c.title == other.title
             && c.reward == other.reward
             && c.contractor == other.contractor
     }
+
+    /// Rebuilds the contract from the screenshots, keeping the loaded flags of the flows
+    /// that are still there (same commodity and pickups).
+    fn reparse(&mut self, universe: &Universe) {
+        let parsed = parse(&self.shots, universe);
+        let mut contract = parsed.contract;
+        for flow in &mut contract.flows {
+            flow.loaded = self
+                .contract
+                .flows
+                .iter()
+                .any(|old| old.loaded && same_flow(old, flow));
+        }
+        self.contract = contract;
+        self.corrections = parsed.corrections;
+        self.edited = false;
+        self.stale = false;
+    }
+}
+
+fn without_loaded(c: &Contract) -> Contract {
+    let mut c = c.clone();
+    for f in &mut c.flows {
+        f.loaded = false;
+    }
+    c
+}
+
+fn same_flow(a: &Flow, b: &Flow) -> bool {
+    let names =
+        |f: &Flow| -> Vec<String> { f.pickups.iter().map(|p| normalize(&p.name)).collect() };
+    a.restricted == b.restricted
+        && normalize(&a.commodity) == normalize(&b.commodity)
+        && names(a) == names(b)
 }
 
 /// What [`ContractStore::add_shot`] did.
@@ -74,25 +109,46 @@ impl ContractStore {
             .unwrap_or_else(|| PathBuf::from("contracts"))
     }
 
-    /// Loads every entry of `dir` (missing directory = empty store). Files that cannot be
-    /// read are skipped and reported in the returned warnings.
+    /// Loads every entry of `dir` (missing directory = empty store) and converts entries
+    /// of the old format. Files that cannot be read are skipped and reported in the
+    /// returned warnings.
     pub fn open(dir: impl Into<PathBuf>) -> (Self, Vec<String>) {
-        let dir = dir.into();
-        let mut entries = Vec::new();
+        let mut store = Self {
+            dir: dir.into(),
+            entries: Vec::new(),
+        };
         let mut warnings = Vec::new();
-        if let Ok(read_dir) = std::fs::read_dir(&dir) {
-            for path in read_dir.flatten().map(|e| e.path()) {
-                let Some(id) = entry_id(&path) else {
-                    continue;
-                };
-                match load_entry(&path, id) {
-                    Ok(entry) => entries.push(entry),
+        let paths: Vec<PathBuf> = std::fs::read_dir(&store.dir)
+            .map(|rd| rd.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default();
+        for path in &paths {
+            if let Some(id) = entry_id(path, ".json") {
+                match load_entry(path, id) {
+                    Ok(entry) => store.entries.push(entry),
                     Err(e) => warnings.push(format!("{}: {e:#}", path.display())),
                 }
             }
         }
-        entries.sort_by_key(|e| std::cmp::Reverse(e.id));
-        (Self { dir, entries }, warnings)
+        for path in &paths {
+            let Some(id) = entry_id(path, ".txt") else {
+                continue;
+            };
+            if store.get(id).is_some() {
+                continue;
+            }
+            let imported = load_old_entry(path, id).and_then(|entry| {
+                store.save(&entry)?;
+                remove_if_exists(path)?;
+                remove_if_exists(&path.with_file_name(format!("{id}.ocr.json")))?;
+                Ok(entry)
+            });
+            match imported {
+                Ok(entry) => store.entries.push(entry),
+                Err(e) => warnings.push(format!("{}: {e:#}", path.display())),
+            }
+        }
+        store.entries.sort_by_key(|e| std::cmp::Reverse(e.id));
+        (store, warnings)
     }
 
     pub fn dir(&self) -> &Path {
@@ -109,13 +165,22 @@ impl ContractStore {
     }
 
     /// Parses `shot` and saves it: merged into the entry of the same contract if there is
-    /// one, otherwise as a new entry.
+    /// one, otherwise as a new entry. Merging re-parses the entry from all its shots,
+    /// unless the player edited it (then it is only marked stale).
     pub fn add_shot(&mut self, shot: ShotText, universe: &Universe) -> Result<Added> {
-        let contract = parse(std::slice::from_ref(&shot), universe);
-        if let Some(i) = self.entries.iter().position(|e| e.same_contract(&contract)) {
+        let parsed = parse(std::slice::from_ref(&shot), universe);
+        if let Some(i) = self
+            .entries
+            .iter()
+            .position(|e| e.same_contract(&parsed.contract))
+        {
             let mut entry = self.entries[i].clone();
             entry.shots.push(shot);
-            entry.contract = parse(&entry.shots, universe);
+            if entry.edited {
+                entry.stale = true;
+            } else {
+                entry.reparse(universe);
+            }
             self.save(&entry)?;
             let id = entry.id;
             self.entries[i] = entry;
@@ -123,8 +188,11 @@ impl ContractStore {
         }
         let entry = Entry {
             id: self.next_id(),
-            contract,
+            contract: parsed.contract,
             shots: vec![shot],
+            corrections: parsed.corrections,
+            edited: false,
+            stale: false,
         };
         self.save(&entry)?;
         let id = entry.id;
@@ -132,15 +200,41 @@ impl ContractStore {
         Ok(Added::New(id))
     }
 
-    pub fn remove(&mut self, id: u64) -> Result<()> {
-        for path in [self.txt_path(id), self.ocr_path(id)] {
-            match std::fs::remove_file(&path) {
-                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                    return Err(e).with_context(|| format!("removing {}", path.display()));
-                }
-                _ => {}
-            }
+    /// Saves the player's changes to an entry's contract. Only changes to what was read
+    /// mark it edited; ticking "loaded" does not.
+    pub fn update(&mut self, id: u64, contract: Contract) -> Result<()> {
+        let Some(i) = self.entries.iter().position(|e| e.id == id) else {
+            bail!("contract {id} not found");
+        };
+        let mut entry = self.entries[i].clone();
+        if entry.contract == contract {
+            return Ok(());
         }
+        entry.edited |= without_loaded(&entry.contract) != without_loaded(&contract);
+        entry.contract = contract;
+        self.save(&entry)?;
+        self.entries[i] = entry;
+        Ok(())
+    }
+
+    /// Rebuilds an entry from its screenshots, discarding the player's edits (loaded flags
+    /// are kept).
+    pub fn reparse(&mut self, id: u64, universe: &Universe) -> Result<()> {
+        let Some(i) = self.entries.iter().position(|e| e.id == id) else {
+            bail!("contract {id} not found");
+        };
+        let mut entry = self.entries[i].clone();
+        if entry.shots.is_empty() {
+            bail!("no screenshot text recorded for this contract");
+        }
+        entry.reparse(universe);
+        self.save(&entry)?;
+        self.entries[i] = entry;
+        Ok(())
+    }
+
+    pub fn remove(&mut self, id: u64) -> Result<()> {
+        remove_if_exists(&self.path(id))?;
         self.entries.retain(|e| e.id != id);
         Ok(())
     }
@@ -153,15 +247,12 @@ impl ContractStore {
     fn save(&self, entry: &Entry) -> Result<()> {
         std::fs::create_dir_all(&self.dir)
             .with_context(|| format!("creating {}", self.dir.display()))?;
-        let mut text = truth::serialize(&entry.contract);
-        for source in entry.sources() {
-            text.push_str(&format!("# source: {}\n", source.display()));
-        }
-        let txt = self.txt_path(entry.id);
-        std::fs::write(&txt, text).with_context(|| format!("writing {}", txt.display()))?;
-        let ocr = self.ocr_path(entry.id);
-        let json = serde_json::to_string_pretty(&entry.shots)?;
-        std::fs::write(&ocr, json).with_context(|| format!("writing {}", ocr.display()))?;
+        let json = serde_json::to_string_pretty(&EntryFile::from(entry))?;
+        let path = self.path(entry.id);
+        // Write then rename, so a crash never leaves a truncated contract.
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, json).with_context(|| format!("writing {}", tmp.display()))?;
+        std::fs::rename(&tmp, &path).with_context(|| format!("writing {}", path.display()))?;
         Ok(())
     }
 
@@ -174,24 +265,38 @@ impl ContractStore {
         now.max(newest + 1)
     }
 
-    fn txt_path(&self, id: u64) -> PathBuf {
-        self.dir.join(format!("{id}.txt"))
-    }
-
-    fn ocr_path(&self, id: u64) -> PathBuf {
-        self.dir.join(format!("{id}.ocr.json"))
+    pub fn path(&self, id: u64) -> PathBuf {
+        self.dir.join(format!("{id}.json"))
     }
 }
 
-/// `<digits>.txt` -> id.
-fn entry_id(path: &Path) -> Option<u64> {
+/// `<digits><suffix>` -> id.
+fn entry_id(path: &Path, suffix: &str) -> Option<u64> {
     let name = path.file_name()?.to_str()?;
-    name.strip_suffix(".txt")?.parse().ok()
+    name.strip_suffix(suffix)?.parse().ok()
 }
 
-fn load_entry(txt: &Path, id: u64) -> Result<Entry> {
-    let text = std::fs::read_to_string(txt)?;
-    let contract = truth::parse(&text)?;
+fn remove_if_exists(path: &Path) -> Result<()> {
+    match std::fs::remove_file(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            Err(e).with_context(|| format!("removing {}", path.display()))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn load_entry(path: &Path, id: u64) -> Result<Entry> {
+    let json = std::fs::read_to_string(path)?;
+    let file: EntryFile = serde_json::from_str(&json)?;
+    if file.version != FORMAT_VERSION {
+        bail!("unsupported format version {}", file.version);
+    }
+    Ok(file.into_entry(id))
+}
+
+/// First format: `<id>.txt` (`#HAULING v1`) + optional `<id>.ocr.json` (shots).
+fn load_old_entry(txt: &Path, id: u64) -> Result<Entry> {
+    let objectives = truth::parse(&std::fs::read_to_string(txt)?)?;
     let ocr = txt.with_file_name(format!("{id}.ocr.json"));
     let shots = match std::fs::read_to_string(&ocr) {
         Ok(json) => {
@@ -201,13 +306,164 @@ fn load_entry(txt: &Path, id: u64) -> Result<Entry> {
     };
     Ok(Entry {
         id,
-        contract,
+        contract: Contract::from_objectives(&objectives),
         shots,
+        corrections: Vec::new(),
+        edited: false,
+        stale: false,
     })
+}
+
+// On-disk DTOs. `sc-contracts` stays serde-free; these mirror its types.
+
+const FORMAT_VERSION: u32 = 1;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct EntryFile {
+    version: u32,
+    contract: ContractFile,
+    #[serde(default)]
+    shots: Vec<ShotText>,
+    #[serde(default)]
+    corrections: Vec<String>,
+    #[serde(default)]
+    edited: bool,
+    #[serde(default)]
+    stale: bool,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct ContractFile {
+    title: Option<String>,
+    reward: Option<u64>,
+    contractor: Option<String>,
+    availability: Option<String>,
+    max_box: Option<u32>,
+    rep: Option<u32>,
+    flows: Vec<FlowFile>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct FlowFile {
+    commodity: String,
+    restricted: bool,
+    pickups: Vec<PlaceFile>,
+    dropoffs: Vec<DropOffFile>,
+    loaded: bool,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct PlaceFile {
+    name: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    uncertain: bool,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct DropOffFile {
+    name: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    uncertain: bool,
+    scu: u32,
+}
+
+impl From<&Entry> for EntryFile {
+    fn from(e: &Entry) -> Self {
+        let place = |p: &Place| PlaceFile {
+            name: p.name.clone(),
+            uncertain: p.uncertain,
+        };
+        let c = &e.contract;
+        Self {
+            version: FORMAT_VERSION,
+            contract: ContractFile {
+                title: c.title.clone(),
+                reward: c.reward,
+                contractor: c.contractor.clone(),
+                availability: c.availability.clone(),
+                max_box: c.max_box,
+                rep: c.rep,
+                flows: c
+                    .flows
+                    .iter()
+                    .map(|f| FlowFile {
+                        commodity: f.commodity.clone(),
+                        restricted: f.restricted,
+                        pickups: f.pickups.iter().map(place).collect(),
+                        dropoffs: f
+                            .dropoffs
+                            .iter()
+                            .map(|d| DropOffFile {
+                                name: d.place.name.clone(),
+                                uncertain: d.place.uncertain,
+                                scu: d.scu,
+                            })
+                            .collect(),
+                        loaded: f.loaded,
+                    })
+                    .collect(),
+            },
+            shots: e.shots.clone(),
+            corrections: e.corrections.clone(),
+            edited: e.edited,
+            stale: e.stale,
+        }
+    }
+}
+
+impl EntryFile {
+    fn into_entry(self, id: u64) -> Entry {
+        let place = |p: PlaceFile| Place {
+            name: p.name,
+            uncertain: p.uncertain,
+        };
+        let c = self.contract;
+        Entry {
+            id,
+            contract: Contract {
+                title: c.title,
+                reward: c.reward,
+                contractor: c.contractor,
+                availability: c.availability,
+                max_box: c.max_box,
+                rep: c.rep,
+                flows: c
+                    .flows
+                    .into_iter()
+                    .map(|f| Flow {
+                        commodity: f.commodity,
+                        restricted: f.restricted,
+                        pickups: f.pickups.into_iter().map(place).collect(),
+                        dropoffs: f
+                            .dropoffs
+                            .into_iter()
+                            .map(|d| DropOff {
+                                place: Place {
+                                    name: d.name,
+                                    uncertain: d.uncertain,
+                                },
+                                scu: d.scu,
+                            })
+                            .collect(),
+                        loaded: f.loaded,
+                    })
+                    .collect(),
+            },
+            shots: self.shots,
+            corrections: self.corrections,
+            edited: self.edited,
+            stale: self.stale,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use sc_contracts::HaulingContract;
     use sc_universe::{DataMeta, UniverseBuilder};
 
     use super::*;
@@ -241,29 +497,34 @@ mod tests {
         truth::parse(&text).unwrap_or_else(|e| panic!("{name}: {e}"))
     }
 
+    fn flows_of(name: &str) -> Contract {
+        Contract::from_objectives(&truth_of(name))
+    }
+
     fn temp() -> tempfile::TempDir {
         tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    fn add(store: &mut ContractStore, stem: &str) -> Added {
+        store
+            .add_shot(shot(stem), &universe())
+            .unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]
     fn add_save_reload_remove() {
         let dir = temp();
-        let u = universe();
         let (mut store, warnings) = ContractStore::open(dir.path());
         assert!(warnings.is_empty() && store.entries().is_empty());
 
-        let a = store
-            .add_shot(shot("01-dead-saints-riker"), &u)
-            .unwrap_or_else(|e| panic!("{e}"));
-        let b = store
-            .add_shot(shot("05-dead-saints-ruin-grimhex"), &u)
-            .unwrap_or_else(|e| panic!("{e}"));
+        let a = add(&mut store, "01-dead-saints-riker");
+        let b = add(&mut store, "06-covalex-wideforest-multidrop");
         assert!(matches!((a, b), (Added::New(_), Added::New(_))));
         assert!(b.id() > a.id());
         assert_eq!(store.entries()[0].id, b.id(), "newest first");
         assert_eq!(
-            store.get(a.id()).map(|e| &e.contract),
-            Some(&truth_of("01-dead-saints-riker"))
+            store.get(b.id()).map(|e| &e.contract),
+            Some(&flows_of("06-covalex-wideforest-multidrop"))
         );
 
         let (reloaded, warnings) = ContractStore::open(dir.path());
@@ -278,41 +539,93 @@ mod tests {
     }
 
     #[test]
-    fn scrolled_shots_merge_into_one_entry() {
+    fn scrolled_shots_merge_and_keep_loaded_flags() {
         let dir = temp();
-        let u = universe();
         let (mut store, _) = ContractStore::open(dir.path());
-        let first = store
-            .add_shot(shot("09-redwind-yela-scroll-1"), &u)
+        let first = add(&mut store, "09-redwind-yela-scroll-1");
+        let mut contract = store.entries()[0].contract.clone();
+        contract.flows[0].loaded = true;
+        store
+            .update(first.id(), contract)
             .unwrap_or_else(|e| panic!("{e}"));
-        let second = store
-            .add_shot(shot("09-redwind-yela-scroll-2"), &u)
-            .unwrap_or_else(|e| panic!("{e}"));
+        assert!(!store.entries()[0].edited, "loaded is not an edit");
+
+        let second = add(&mut store, "09-redwind-yela-scroll-2");
         assert_eq!(second, Added::Merged(first.id()));
         assert_eq!(store.entries().len(), 1);
         let entry = &store.entries()[0];
-        assert_eq!(entry.contract, truth_of("09-redwind-yela-scroll"));
-        assert_eq!(entry.sources().count(), 2);
+        let mut want = flows_of("09-redwind-yela-scroll");
+        want.flows[0].loaded = true;
+        assert_eq!(entry.contract, want);
+        assert_eq!(entry.shots.len(), 2);
 
         // A re-capture of the same screen changes nothing.
-        let again = store
-            .add_shot(shot("09-redwind-yela-scroll-2"), &u)
+        add(&mut store, "09-redwind-yela-scroll-2");
+        assert_eq!(store.entries()[0].contract, want);
+    }
+
+    #[test]
+    fn edited_entries_are_not_reparsed_on_merge() {
+        let dir = temp();
+        let (mut store, _) = ContractStore::open(dir.path());
+        let id = add(&mut store, "09-redwind-yela-scroll-1").id();
+        let mut contract = store.entries()[0].contract.clone();
+        contract.availability = Some("1h".into());
+        store
+            .update(id, contract.clone())
             .unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(again, Added::Merged(first.id()));
+
+        assert_eq!(
+            add(&mut store, "09-redwind-yela-scroll-2"),
+            Added::Merged(id)
+        );
+        let entry = &store.entries()[0];
+        assert!(entry.edited && entry.stale);
+        assert_eq!(entry.contract, contract);
+        assert_eq!(entry.shots.len(), 2);
+
+        store
+            .reparse(id, &universe())
+            .unwrap_or_else(|e| panic!("{e}"));
+        let entry = &store.entries()[0];
+        assert!(!entry.edited && !entry.stale);
+        assert_eq!(entry.contract, flows_of("09-redwind-yela-scroll"));
+        // Survives a reload.
+        assert_eq!(ContractStore::open(dir.path()).0.entries(), store.entries());
+    }
+
+    #[test]
+    fn imports_the_old_format() {
+        let dir = temp();
+        let truth = truth::serialize(&truth_of("07-covalex-lyria-multipickup"));
+        std::fs::write(dir.path().join("100.txt"), truth).unwrap_or_else(|e| panic!("{e}"));
+        let shots = serde_json::to_string(&[shot("07-covalex-lyria-multipickup")])
+            .unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.path().join("100.ocr.json"), shots).unwrap_or_else(|e| panic!("{e}"));
+
+        let (store, warnings) = ContractStore::open(dir.path());
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert_eq!(store.entries().len(), 1);
         assert_eq!(
             store.entries()[0].contract,
-            truth_of("09-redwind-yela-scroll")
+            flows_of("07-covalex-lyria-multipickup")
         );
+        assert_eq!(store.entries()[0].shots.len(), 1);
+        assert!(dir.path().join("100.json").is_file());
+        assert!(!dir.path().join("100.txt").exists());
+        assert!(!dir.path().join("100.ocr.json").exists());
+        assert_eq!(ContractStore::open(dir.path()).0.entries(), store.entries());
     }
 
     #[test]
     fn unreadable_files_are_reported() {
         let dir = temp();
-        std::fs::write(dir.path().join("123.txt"), "not a contract")
+        std::fs::write(dir.path().join("123.json"), "{").unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.path().join("124.txt"), "not a contract")
             .unwrap_or_else(|e| panic!("{e}"));
         std::fs::write(dir.path().join("notes.txt"), "ignored").unwrap_or_else(|e| panic!("{e}"));
         let (store, warnings) = ContractStore::open(dir.path());
         assert!(store.entries().is_empty());
-        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings.len(), 2);
     }
 }

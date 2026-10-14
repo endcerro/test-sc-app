@@ -244,11 +244,21 @@ cargo run -p sc-companion --release --features ocr -- contract samples/03-redwin
   the benchmark uses (`sc_ocr::models::default_dir`), checked against their pinned sha256.
 - The four regions are read concurrently (4 sessions per model): about 1.5-2 s per 1080p
   screenshot on a Ryzen 7 9800X3D, plus ~0.5 s to load the engine on the first one.
-- Every dropped file is read on a background thread, one at a time, then parsed and saved in
-  `<data dir>/sc-companion/contracts` (override with `--contracts-dir`): `<id>.txt` is the
-  contract in `#HAULING v1` (+ `# source:` comments), `<id>.ocr.json` the raw region text.
-  A screenshot whose title, reward and contractor match a saved contract is merged into it
-  (`contract_from_shots`), so dropping 09-1 then 09-2 gives the merged truth.
+- Every dropped file is read on a background thread, one at a time, then parsed into
+  flows (`sc_contracts::Contract`, see `docs/architecture.md`) and saved in
+  `<data dir>/sc-companion/contracts` (override with `--contracts-dir`) as `<id>.json`: the
+  contract (with the player's edits and loaded flags), the snapping corrections and the raw
+  region text of every screenshot. Stores of the first version (`<id>.txt` + `<id>.ocr.json`)
+  are converted on open.
+- A screenshot whose title, reward and contractor match a saved contract is merged into it
+  (`contract_from_shots`, then re-parsed), so dropping 09-1 then 09-2 gives the merged truth.
+  A contract the player edited is not re-parsed: the shot is attached and a check asks to
+  re-parse (which discards the edits; loaded flags are kept).
+- Checks shown on a card: names snapping changed (low-confidence reads, e.g. `E'tam
+  commodity, read "Etam"`), inferred pickups (`?`), places not found in the universe,
+  missing title/reward, broken lines. Descriptive places such as `ArcCorp's Yela facility`
+  have no starmap counterpart and show as not found until an alias is added.
+- `sc-companion contract FILE...` prints the `#HAULING` objectives, the flows and the checks.
 - On the samples the app output matches the truth files except that the thin `|` title
   separators are sometimes not read (01, 02, 06); scoring ignores punctuation in titles.
 

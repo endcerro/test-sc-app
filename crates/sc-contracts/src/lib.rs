@@ -5,6 +5,10 @@
 //! into a contract ([`parse`]), merging of scrolled screenshots ([`merge`]), optional
 //! dictionary snapping ([`snap`]) and scoring against truth ([`score`]).
 //!
+//! [`HaulingContract`] is the contract as the screen lists it (one line per `Deliver`
+//! objective). [`Contract`] is the same contract as commodity flows between pickups and
+//! drop-offs, the form the app stores, edits and plans routes with.
+//!
 //! The screen has four regions of interest, OCR'd separately:
 //!
 //! ```text
@@ -15,6 +19,7 @@
 //!            "Collect Ammonia from Ruin Station."
 //! ```
 
+mod contract;
 pub mod merge;
 mod model;
 pub mod parse;
@@ -23,6 +28,7 @@ pub mod score;
 pub mod snap;
 pub mod truth;
 
+pub use contract::{Contract, DropOff, Flow};
 pub use model::{Cargo, HaulingContract, Place};
 pub use parse::{ObjectiveItem, RegionText};
 pub use score::{Score, score};

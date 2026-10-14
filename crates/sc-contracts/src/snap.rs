@@ -3,7 +3,7 @@
 
 use std::sync::OnceLock;
 
-use sc_universe::{LookupOptions, Universe, normalize};
+use sc_universe::{LookupOptions, Match, Universe, normalize};
 use strsim::normalized_levenshtein;
 
 use crate::HaulingContract;
@@ -35,37 +35,57 @@ pub fn commodity(name: &str) -> Option<&'static str> {
 /// spelling, never swaps a name for a different, merely similar-looking one.
 const PLACE_MIN: f64 = 0.85;
 
+/// Words joining a place name to its parent (`Ruin Station above Pyro VI`).
+const LINKS: [&str; 4] = ["above", "on", "in", "within"];
+
+/// `Ruin Station above Pyro VI` -> (`Ruin Station`, `Some("above Pyro VI")`). The link must
+/// follow at least one word and be followed by one.
+pub fn split_place(name: &str) -> (&str, Option<&str>) {
+    let mut offset = 0;
+    for (i, word) in name.split(' ').enumerate() {
+        if i > 0 && LINKS.contains(&word) && offset + word.len() < name.len() {
+            return (&name[..offset - 1], Some(&name[offset..]));
+        }
+        offset += word.len() + 1;
+    }
+    (name, None)
+}
+
+/// The location a contract place name refers to: its `<name>` part (see [`split_place`])
+/// matched exactly, or fuzzily when the spelling is close enough.
+pub fn resolve_place(universe: &Universe, name: &str) -> Option<Match> {
+    let (part, _) = split_place(name.trim());
+    if let Some(m) = universe.find_exact(part).into_iter().next() {
+        return Some(m);
+    }
+    let opts = LookupOptions {
+        limit: 1,
+        ..LookupOptions::default()
+    };
+    universe
+        .find_fuzzy(part, opts)
+        .into_iter()
+        .next()
+        .filter(|m| {
+            let known = universe.matched_name(m);
+            normalized_levenshtein(&normalize(known), &normalize(part)) >= PLACE_MIN
+        })
+}
+
 /// Place names are `<name> <link> <parent>` (`Ruin Station above Pyro VI`). Only `<name>`
 /// is snapped: contracts call planets by designation (`Pyro VI`) while the starmap uses
 /// their names (`Terminus`), so parents and descriptive names (`Yela's asteroid belt`,
 /// `ArcCorp's Yela facility`) have no reliable counterpart and are kept as read.
 pub fn place(universe: &Universe, name: &str) -> String {
-    let opts = LookupOptions {
-        limit: 1,
-        ..LookupOptions::default()
+    let (part, rest) = split_place(name);
+    let snapped = if universe.find_exact(part).is_empty() {
+        resolve_place(universe, part).map_or(part, |m| universe.matched_name(&m))
+    } else {
+        part
     };
-    let snap = |part: &str| -> String {
-        if !universe.find_exact(part).is_empty() {
-            return part.to_owned();
-        }
-        universe
-            .find_fuzzy(part, opts)
-            .first()
-            .map(|m| universe.matched_name(m))
-            .filter(|known| {
-                normalized_levenshtein(&normalize(known), &normalize(part)) >= PLACE_MIN
-            })
-            .map_or_else(|| part.to_owned(), str::to_owned)
-    };
-    let words: Vec<&str> = name.split(' ').collect();
-    match words
-        .iter()
-        .position(|w| ["above", "on", "in", "within"].contains(w))
-    {
-        Some(i) if i > 0 && i + 1 < words.len() => {
-            format!("{} {}", snap(&words[..i].join(" ")), words[i..].join(" "))
-        }
-        _ => snap(name),
+    match rest {
+        Some(rest) => format!("{snapped} {rest}"),
+        None => snapped.to_owned(),
     }
 }
 
@@ -97,6 +117,21 @@ mod tests {
     fn list_is_embedded() {
         assert!(commodities().len() > 150);
         assert!(commodities().iter().any(|c| c == "E'tam"));
+    }
+
+    #[test]
+    fn splits_place_names() {
+        assert_eq!(
+            split_place("Ruin Station above Pyro VI"),
+            ("Ruin Station", Some("above Pyro VI"))
+        );
+        assert_eq!(
+            split_place("Sunset Mesa on Pyro II"),
+            ("Sunset Mesa", Some("on Pyro II"))
+        );
+        assert_eq!(split_place("Baijini Point"), ("Baijini Point", None));
+        assert_eq!(split_place("on Pyro II"), ("on Pyro II", None));
+        assert_eq!(split_place("Station in"), ("Station in", None));
     }
 
     #[test]

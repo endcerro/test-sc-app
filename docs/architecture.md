@@ -13,6 +13,12 @@ tools/ocr-bench ──►  (pixels → text)  (text → HaulingContract, pure)
 
 - **sc-contracts** / **sc-ocr** / **tools/ocr-bench**: contract OCR, see `docs/ocr.md`. The
   app uses them in `src/contracts/` (reader + saved list) behind its `ocr` feature.
+  `HaulingContract` is the contract as the screen lists it (one line per `Deliver` objective:
+  one drop-off, 1+ pickups; truth files and scoring use it). `Contract` is the contract to
+  plan: commodity **flows**, each with one pickup and N drop-offs (SCU per drop-off) or N
+  pickups and one drop-off (total SCU; the game does not split it per pickup).
+  `Contract::from_objectives` merges `Deliver` lines of the same commodity from the same
+  single pickup; `to_objectives` goes back.
 
 - **sc-universe**: no IO. Owns the model and all algorithms on it (tree queries, distances,
   routing, name lookup). Everything else depends on it.
@@ -104,12 +110,17 @@ side panels and central area.
   distance/route from the focus or a pinned "measure from" location.
 
 **Contracts pane** (`gui/contracts/`, a temporary view: the UI will be redesigned, the
-`contracts` reader/store underneath are meant to stay): a drop box (files dropped anywhere in the window, or a
-file dialog) feeds `worker.rs`, a thread that owns the `ContractReader` and reads one
-screenshot at a time (models downloaded and the engine loaded on the first one). Each result
-is parsed, snapped to the universe and saved through `contracts::ContractStore` (merged into
-an existing entry when title, reward and contractor match), then shown as a card in the
-column. The selected card opens a side panel with the screenshots, raw OCR text and Remove.
+`contracts` reader/store underneath are meant to stay): a drop box (files dropped anywhere in
+the window, or a file dialog) feeds `worker.rs`, a thread that owns the `ContractReader` and
+reads one screenshot at a time (models downloaded and the engine loaded on the first one).
+Each result is parsed into flows, snapped to the universe and saved through
+`contracts::ContractStore` (merged into an existing entry when title, reward and contractor
+match), then shown as an editable card (`card.rs`) in the column: header fields, one row per
+flow (SCU | cargo | pickups | drop-offs | loaded) with each place's resolved universe path,
+"Check:" lines from `contracts::checks`, "Show capture" (screenshots, OCR text, re-parse) and
+a footer. Edits go through a `Draft` (every field as typed text, `draft.rs`) and are saved
+when a field loses focus or a button/checkbox is used. The "+" for a place is disabled when
+it would give a line several pickups *and* several drop-offs.
 
 ### Name lookup (for OCR)
 
@@ -158,4 +169,4 @@ labels-derived) are resolved against the kept nodes (`scunpacked/aliases.rs`).
   contracts) onto locations.
 - Trading pane; map overlays for routes once the optimizer exists.
 - Screen capture (hotkey) instead of dropping screenshot files; commodity terminal screens; the cargo route optimizer on top of `Universe::route` and
-  `HaulingContract`.
+  `Contract` flows.

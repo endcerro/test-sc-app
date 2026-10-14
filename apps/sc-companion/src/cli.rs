@@ -10,7 +10,7 @@ use sc_data::UniverseSource;
 use sc_universe::{Leg, Location, LocationId, LocationKind, LookupOptions, Match, Universe};
 
 use crate::SourceArgs;
-use crate::contracts::{self, ContractReader, ContractStore, store::Added};
+use crate::contracts::{self, ContractReader, ContractStore, Entry, store::Added};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -331,25 +331,43 @@ fn read_contracts(
             }
             println!("---");
         }
-        let contract = match &mut store {
+        let entry = match &mut store {
             Some(store) => {
                 let added = store.add_shot(shot, u)?;
                 let verb = match added {
                     Added::New(_) => "saved as",
                     Added::Merged(_) => "merged into",
                 };
-                eprintln!(
-                    "{verb} {}",
-                    store.dir().join(format!("{}.txt", added.id())).display()
-                );
+                eprintln!("{verb} {}", store.path(added.id()).display());
                 store
                     .get(added.id())
-                    .map(|e| e.contract.clone())
-                    .unwrap_or_default()
+                    .cloned()
+                    .context("saved contract not found")?
             }
-            None => contracts::parse(std::slice::from_ref(&shot), u),
+            None => {
+                let parsed = contracts::parse(std::slice::from_ref(&shot), u);
+                Entry {
+                    id: 0,
+                    contract: parsed.contract,
+                    shots: vec![shot],
+                    corrections: parsed.corrections,
+                    edited: false,
+                    stale: false,
+                }
+            }
         };
-        println!("{}", sc_contracts::truth::serialize(&contract));
+        println!(
+            "{}",
+            sc_contracts::truth::serialize(&entry.contract.to_objectives())
+        );
+        for flow in &entry.contract.flows {
+            println!("flow: {}", contracts::flow_line(flow));
+        }
+        let mut known = |name: &str| sc_contracts::snap::resolve_place(u, name).is_some();
+        for check in contracts::checks::checks(&entry, &mut known) {
+            println!("check: {check}");
+        }
+        println!();
     }
     Ok(())
 }

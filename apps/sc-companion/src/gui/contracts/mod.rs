@@ -1,21 +1,25 @@
-//! Contracts pane: drop hauling contract screenshots, they are OCR'd in the background,
-//! parsed, saved, and listed as cards in a column (newest first). The selected card's
-//! screenshots and raw OCR text show in a side panel.
+//! Contracts pane (a temporary view): drop hauling contract screenshots, they are OCR'd in
+//! the background, parsed into flows, saved, and listed as editable cards in a column
+//! (newest first).
 
+mod card;
+mod draft;
 mod format;
 mod worker;
 
-use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use eframe::egui::{self, Color32, RichText, Sense, Stroke};
-use sc_contracts::{HaulingContract, Place};
+use card::{Action, Captures, Card, Resolver};
+use draft::Draft;
+use eframe::egui::{self, RichText, Sense, Stroke};
 use sc_data::LoadedUniverse;
 use worker::{Outcome, Worker};
 
 use crate::contracts::reader::{EXTENSIONS, NO_OCR, file_name, is_screenshot};
 use crate::contracts::store::Added;
-use crate::contracts::{ContractReader, ContractStore, Entry, ShotText};
+use crate::contracts::{ContractReader, ContractStore, ShotText};
 
 /// Most messages kept under the drop box.
 const MAX_MESSAGES: usize = 6;
@@ -26,21 +30,18 @@ struct Message {
     error: bool,
 }
 
-/// Screenshot textures of the selected entry, loaded when it is selected.
-struct Preview {
-    id: u64,
-    /// One per shot: the texture, or why there is none.
-    images: Vec<Result<egui::TextureHandle, String>>,
-}
-
 pub struct ContractsPane {
     data: Arc<LoadedUniverse>,
     store: ContractStore,
     /// `None` when this build has no OCR.
     worker: Option<Worker>,
     messages: Vec<Message>,
-    selected: Option<u64>,
-    preview: Option<Preview>,
+    /// Editable copies of the contracts, by entry id.
+    drafts: HashMap<u64, Draft>,
+    /// Place name -> universe path, see [`Resolver`].
+    paths: HashMap<String, Option<String>>,
+    captures: Captures,
+    confirm_remove: Option<u64>,
     confirm_clear: bool,
 }
 
@@ -59,8 +60,10 @@ impl ContractsPane {
             store,
             worker: ContractReader::available().then(|| Worker::start(ctx)),
             messages,
-            selected: None,
-            preview: None,
+            drafts: HashMap::new(),
+            paths: HashMap::new(),
+            captures: Captures::new(),
+            confirm_remove: None,
             confirm_clear: false,
         }
     }
@@ -68,19 +71,6 @@ impl ContractsPane {
     pub fn show(&mut self, ctx: &egui::Context) {
         self.take_dropped_files(ctx);
         self.poll_worker();
-
-        if let Some(id) = self.selected {
-            let mut close = false;
-            egui::SidePanel::right("contract_details")
-                .default_width(460.0)
-                .show(ctx, |ui| {
-                    egui::ScrollArea::vertical().show(ui, |ui| close = self.details(ui, id));
-                });
-            if close {
-                self.selected = None;
-                self.preview = None;
-            }
-        }
         egui::CentralPanel::default().show(ctx, |ui| {
             self.header(ui);
             self.drop_box(ui);
@@ -143,13 +133,9 @@ impl ContractsPane {
             Ok(added) => {
                 let id = added.id();
                 if let (Added::Merged(_), Some(e)) = (added, self.store.get(id)) {
-                    let title = format::title(&e.contract).to_owned();
+                    let title = e.contract.title.clone().unwrap_or_default();
                     self.message(format!("{name} merged into \"{title}\""), false);
                 }
-                if self.preview.as_ref().is_some_and(|p| p.id == id) {
-                    self.preview = None;
-                }
-                self.selected = Some(id);
             }
             Err(e) => self.message(format!("{name}: could not save: {e:#}"), true),
         }
@@ -185,8 +171,8 @@ impl ContractsPane {
                     .clicked()
                 {
                     self.confirm_clear = false;
-                    self.selected = None;
-                    self.preview = None;
+                    self.drafts.clear();
+                    self.captures.clear();
                     if let Err(e) = self.store.clear() {
                         self.message(format!("Could not remove every contract: {e:#}"), true);
                     }
@@ -293,197 +279,84 @@ impl ContractsPane {
             });
             return;
         }
-        let mut clicked = None;
+        let mut actions: Vec<(u64, Action)> = Vec::new();
+        let Self {
+            data,
+            store,
+            drafts,
+            paths,
+            captures,
+            confirm_remove,
+            ..
+        } = self;
+        let mut resolver = Resolver {
+            universe: &data.universe,
+            cache: paths,
+        };
+        let total = store.entries().len();
         egui::ScrollArea::vertical()
             .auto_shrink(false)
             .show(ui, |ui| {
-                for entry in self.store.entries() {
-                    let selected = self.selected == Some(entry.id);
-                    if card(ui, entry, selected).clicked() {
-                        clicked = Some(entry.id);
+                for (i, entry) in store.entries().iter().enumerate() {
+                    let draft = drafts
+                        .entry(entry.id)
+                        .or_insert_with(|| Draft::new(&entry.contract));
+                    // Changed elsewhere (merged screenshot, re-parse): start over from it.
+                    if draft.base != entry.contract {
+                        *draft = Draft::new(&entry.contract);
                     }
-                    ui.add_space(6.0);
+                    let card = Card {
+                        number: total - i,
+                        entry,
+                        draft,
+                        resolver: &mut resolver,
+                        captures,
+                        confirm_remove: *confirm_remove == Some(entry.id),
+                    };
+                    actions.extend(card.show(ui).into_iter().map(|a| (entry.id, a)));
+                    ui.add_space(8.0);
                 }
             });
-        if let Some(id) = clicked {
-            self.selected = (self.selected != Some(id)).then_some(id);
+        for (id, action) in actions {
+            self.apply(id, action);
         }
     }
 
-    /// Side panel of the selected entry. Returns true to close it.
-    fn details(&mut self, ui: &mut egui::Ui, id: u64) -> bool {
-        let Some(entry) = self.store.get(id).cloned() else {
-            return true;
+    fn apply(&mut self, id: u64, action: Action) {
+        let result = match action {
+            Action::Commit => match self.drafts.get_mut(&id) {
+                Some(draft) => {
+                    let contract = draft.to_contract();
+                    let saved = self.store.update(id, contract.clone());
+                    if saved.is_ok() {
+                        // Keep the draft: blank rows the player just added stay visible.
+                        draft.base = contract;
+                    }
+                    saved
+                }
+                None => Ok(()),
+            },
+            Action::AskRemove => {
+                self.confirm_remove = Some(id);
+                Ok(())
+            }
+            Action::CancelRemove => {
+                self.confirm_remove = None;
+                Ok(())
+            }
+            Action::Remove => {
+                self.confirm_remove = None;
+                self.drafts.remove(&id);
+                self.captures.remove(&id);
+                self.store.remove(id)
+            }
+            Action::Reparse => {
+                self.drafts.remove(&id);
+                self.store.reparse(id, &self.data.universe)
+            }
         };
-        let mut close = false;
-        ui.horizontal(|ui| {
-            ui.strong("Screenshots");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                close = ui.button("Close").clicked();
-                if ui.button("Remove").clicked() {
-                    match self.store.remove(id) {
-                        Ok(()) => close = true,
-                        Err(e) => self.message(format!("Could not remove: {e:#}"), true),
-                    }
-                }
-            });
-        });
-        ui.label(
-            RichText::new(format!(
-                "Saved as {}",
-                self.store.dir().join(format!("{id}.txt")).display()
-            ))
-            .small()
-            .weak(),
-        );
-        ui.separator();
-        if entry.shots.is_empty() {
-            ui.label(RichText::new("No screenshot recorded for this contract.").weak());
+        if let Err(e) = result {
+            self.message(format!("Could not save the contract: {e:#}"), true);
         }
-
-        if self.preview.as_ref().is_none_or(|p| p.id != id) {
-            self.preview = Some(Preview {
-                id,
-                images: entry
-                    .shots
-                    .iter()
-                    .enumerate()
-                    .map(|(i, s)| load_texture(ui.ctx(), s.source.as_deref(), &format!("{id}-{i}")))
-                    .collect(),
-            });
-        }
-        let images = self
-            .preview
-            .as_ref()
-            .map(|p| p.images.as_slice())
-            .unwrap_or_default();
-        for (i, shot) in entry.shots.iter().enumerate() {
-            let source = shot.source.as_deref();
-            ui.label(source.map_or_else(|| "(unknown file)".to_owned(), file_name))
-                .on_hover_text(source.map(|p| p.display().to_string()).unwrap_or_default());
-            match images.get(i) {
-                Some(Ok(texture)) => {
-                    ui.add(egui::Image::new(texture).max_width(ui.available_width()));
-                }
-                Some(Err(e)) => {
-                    ui.label(RichText::new(e).weak());
-                }
-                None => {}
-            }
-            egui::CollapsingHeader::new("OCR text")
-                .id_salt(("ocr", id, i))
-                .show(ui, |ui| ocr_text(ui, shot));
-            ui.add_space(8.0);
-        }
-        close
-    }
-}
-
-fn load_texture(
-    ctx: &egui::Context,
-    path: Option<&Path>,
-    name: &str,
-) -> Result<egui::TextureHandle, String> {
-    let path = path.ok_or("No file recorded.")?;
-    if !path.is_file() {
-        return Err("File not found (moved or deleted).".into());
-    }
-    let img = sc_ocr::load_image(path).map_err(|e| e.to_string())?;
-    let size = [img.width() as usize, img.height() as usize];
-    let image = egui::ColorImage::from_rgb(size, img.as_raw());
-    Ok(ctx.load_texture(name, image, egui::TextureOptions::LINEAR))
-}
-
-fn ocr_text(ui: &mut egui::Ui, shot: &ShotText) {
-    for (label, text) in [
-        ("Title", &shot.title),
-        ("Reward", &shot.reward),
-        ("Details", &shot.details),
-        ("Objectives", &shot.objectives),
-    ] {
-        ui.label(RichText::new(label).weak());
-        ui.label(RichText::new(text.as_str()).monospace().small());
-    }
-}
-
-/// One contract in the column. The whole card is clickable.
-fn card(ui: &mut egui::Ui, entry: &Entry, selected: bool) -> egui::Response {
-    let c = &entry.contract;
-    let visuals = ui.visuals();
-    let stroke = if selected {
-        Stroke::new(1.5_f32, visuals.selection.stroke.color)
-    } else {
-        Stroke::new(1.0_f32, visuals.widgets.noninteractive.bg_stroke.color)
-    };
-    egui::Frame::group(ui.style())
-        .stroke(stroke)
-        .fill(visuals.faint_bg_color)
-        .inner_margin(10)
-        .show(ui, |ui| {
-            ui.set_min_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(format::title(c)).strong());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(format::reward(c))
-                            .strong()
-                            .color(Color32::from_rgb(120, 200, 120)),
-                    );
-                });
-            });
-            let byline = format::byline(c);
-            if !byline.is_empty() {
-                ui.label(byline);
-            }
-            ui.label(RichText::new(format::facts(entry)).weak());
-            if !c.cargo.is_empty() {
-                ui.add_space(4.0);
-                cargo_grid(ui, entry.id, c);
-            }
-        })
-        .response
-        .interact(Sense::click())
-        .on_hover_cursor(egui::CursorIcon::PointingHand)
-}
-
-fn cargo_grid(ui: &mut egui::Ui, id: u64, c: &HaulingContract) {
-    egui::Grid::new(("cargo", id))
-        .num_columns(4)
-        .spacing([14.0, 2.0])
-        .striped(true)
-        .show(ui, |ui| {
-            for h in ["SCU", "Commodity", "Pick up", "Deliver to"] {
-                ui.label(RichText::new(h).small().weak());
-            }
-            ui.end_row();
-            for cargo in &c.cargo {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new(cargo.scu.to_string()).monospace());
-                });
-                if cargo.restricted {
-                    let text =
-                        RichText::new(cargo.display_commodity()).color(ui.visuals().warn_fg_color);
-                    ui.label(text).on_hover_text("Restricted cargo");
-                } else {
-                    ui.label(cargo.display_commodity());
-                }
-                ui.vertical(|ui| {
-                    for p in &cargo.pickups {
-                        place(ui, p);
-                    }
-                });
-                place(ui, &cargo.dropoff);
-                ui.end_row();
-            }
-        });
-}
-
-/// A place; inferred ones (not read on screen) get a `?` and the warning colour.
-fn place(ui: &mut egui::Ui, p: &Place) {
-    if p.uncertain {
-        ui.label(RichText::new(p.to_string()).color(ui.visuals().warn_fg_color))
-            .on_hover_text("Not on the screenshot: inferred from the other cargo lines");
-    } else {
-        ui.label(&p.name);
     }
 }
