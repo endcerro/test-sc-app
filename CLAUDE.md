@@ -10,7 +10,8 @@ Roadmap:
 1. **Universe data** (done): location tree + coordinates + distances, fetched once at launch.
 2. **OCR** of in-game screens (commodity terminals, contracts) → resolve names to locations.
 3. **Cargo route optimizer** fed by OCR'd prices and the universe distances.
-4. **GUI** with egui/eframe (`apps/sc-companion` becomes the eframe app).
+4. **GUI** with egui/eframe (`apps/sc-companion`): pane shell + **Map** pane done; other panes
+   (trading, OCR) come with their tools.
 
 Read `docs/architecture.md` (design) and `docs/data-sources.md` (where the data comes from,
 file schemas, quirks) before changing the data layer.
@@ -23,7 +24,8 @@ file schemas, quirks) before changing the data layer.
 | `crates/sc-data` | Data sources → `Universe`. `ScunpackedSource` (local dir or GitHub + disk cache), `HttpClient` trait, `Cache`, aliases (`scunpacked/aliases.rs`). |
 | `crates/sc-data/data/aliases.json` | Hand-maintained aliases (embedded), keyed by starmap UUID. |
 | `crates/sc-data/tests/fixtures/scunpacked` | Trimmed real scunpacked files (game 4.10.2) used by offline tests. |
-| `apps/sc-companion` | Binary. Currently a CLI inspector (`summary`, `tree`, `find`, `dist`, `trading`). |
+| `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI inspector (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`). |
+| `apps/sc-companion/src/gui/map` | Map pane: `camera` (f64 orthographic 2D/3D projection), `scene` (pure what-to-draw + LOD, tested), `paint`, `style`, `inspector`. |
 
 ## Commands
 
@@ -33,6 +35,8 @@ cargo test --workspace                       # offline, must always pass
 cargo test -p sc-data -- --ignored           # live GitHub download (network)
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
+cargo run -p sc-companion                                            # GUI
+cargo run -p sc-companion -- --data-dir crates/sc-data/tests/fixtures/scunpacked   # GUI, offline fixture
 cargo run -p sc-companion -- summary
 cargo run -p sc-companion -- tree stanton --depth 2 --visible-only
 cargo run -p sc-companion -- find "port tresler"
@@ -47,7 +51,11 @@ CI (`.github/workflows/ci.yml`) runs fmt check, clippy `-D warnings` and tests.
 ## Conventions
 
 - `sc-universe` stays IO-free and dependency-light; anything touching disk/network goes in
-  `sc-data` (or a future crate). The GUI must not reach into source DTOs.
+  `sc-data` (or a future crate). The GUI must not reach into source DTOs, and egui stays out
+  of the library crates.
+- GUI: keep computation (projection, scene/LOD) separate from painting so it can be unit
+  tested; world maths in f64 relative to the camera centre, f32 only once in pixels. Avoid
+  non-Latin-1 symbols in UI strings (egui's default fonts lack e.g. `→`, `✕`).
 - Errors: `thiserror` enums in libraries, `anyhow` only in `apps/`.
 - No `unwrap`/`expect` in library code (clippy warns; CI denies warnings). In tests, prefer
   `unwrap_or_else(|e| panic!("{e}"))`.

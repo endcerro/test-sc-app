@@ -13,8 +13,9 @@ apps/sc-companion  ──►  sc-data  ──►  sc-universe
 - **sc-data**: turns external data into a `Universe`. One module per source
   (`scunpacked/` today, `uex/` later). Owns HTTP (`http::HttpClient`, `UreqClient`) and the
   on-disk `Cache`.
-- **apps/sc-companion**: entry point. CLI inspector today; the eframe GUI later. Loading is
-  synchronous, so in the GUI it runs on a background thread at startup.
+- **apps/sc-companion**: entry point. No subcommand opens the eframe GUI; subcommands run the
+  CLI inspector. Both build the source from the same `SourceArgs` flags. Loading is
+  synchronous, so in the GUI it runs on a background thread at startup (`gui/loader.rs`).
 
 ## Universe model
 
@@ -73,6 +74,29 @@ Warnings never fail the build; they're returned next to the `Universe`.
 - Accuracy: body/station positions are exact; surface sites ignore planet rotation, so error is
   bounded by the body's diameter. Quantum travel obstruction/arrival radii are not modelled yet.
 
+### GUI
+
+`gui/mod.rs` is the shell: a top bar with pane tabs (Map; Trading and OCR are placeholders)
+and data provenance, a spinner while loading, an error + Retry on failure. Each pane owns its
+side panels and central area.
+
+**Map pane** (`gui/map/`), one star system at a time:
+
+- `camera.rs`: orthographic camera, `center` (system frame, f64 metres) + `scale` (m/px),
+  top-down or tilted (yaw around Z, pitch towards the plane). Projection is done in f64
+  relative to the centre so metre offsets survive at 10¹¹ m. Zoom keeps the point under the
+  cursor fixed; focus changes animate (log-interpolated scale).
+- `scene.rs`: pure "what to draw". `MapIndex` precomputes each location's *cluster radius*
+  (sphere containing its subtree). Focus drill-down + LOD: a node's children are drawn when
+  its cluster spans > 30 px on screen or it is on the focus path; otherwise they fold into its
+  marker as `+N`. Orbits: planets around the star (so the `Pyro IV` mis-parenting is
+  harmless), moons around their body. Tilted view adds a polar grid and drop-lines to the
+  orbital plane. Jump points get a clickable `» <system>` label.
+- `paint.rs` / `style.rs`: markers per `LocationKind`, real-size translucent bodies, dimmed
+  hidden locations, hollow inherited positions, trading ring, greedy label decluttering.
+- `inspector.rs`: all `Location` fields, amenities, aliases, children, jump links, and the
+  distance/route from the focus or a pinned "measure from" location.
+
 ### Name lookup (for OCR)
 
 `normalize()` folds Unicode, case, punctuation, apostrophes, `&`, and `centre/center`.
@@ -118,5 +142,5 @@ labels-derived) are resolved against the kept nodes (`scunpacked/aliases.rs`).
 - `sc-data::uex`: terminals + prices, joined onto the universe (see `data-sources.md`).
 - More aliases: UEX terminal names, common abbreviations; map `trade_locations` UUIDs (hauling
   contracts) onto locations.
-- eframe app shell with async startup load and a universe browser.
+- More panes (trading, OCR); map overlays for routes once the optimizer exists.
 - OCR crate and the cargo route optimizer on top of `Universe::route`.
