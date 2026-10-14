@@ -1,0 +1,15 @@
+Deliver 0/80 SCU of Carbon to Grim HEX within Yela's
+asteroid belt.
+Collect Carbon from Ruin Station.
+Deliver 0/16 SCU of [!] WiDoW to Grim HEX within Yela's
+asteroid belt.
+Collect [!] WiDoW from Ruin Station.
+Deliver 0/64 SCU of Potassium to Grim HEX within Yela's
+asteroid belt.
+Collect Potassium from Ruin Station.
+Deliver 0/18 SCU of Construction Materials to Grim HEX
+within Yela's asteroid belt.
+Collect Construction Materials from Ruin Station.
+Deliver 0/2 SCU of [!] Neon to Grim HEX within Yela's
+asteroid belt.
+Collect [!] Neon from Ruin Station.

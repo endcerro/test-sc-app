@@ -1,0 +1,9 @@
+#HAULING v1
+
+CONTRACT: Rookie | Small Haul | from ARC-L1 Wide Forest Station [BP]*
+REWARD: 49,750 aUEC
+CONTRACTOR: Covalex Independent Contractors
+AVAILABILITY: 2h 1m
+MAXBOX: 4
+CARGO: 5 SCU | Corundum | ARC-L1 Wide Forest Station | Seraphim Station above Crusader
+CARGO: 6 SCU | Corundum | ARC-L1 Wide Forest Station | Baijini Point above ArcCorp

@@ -1,0 +1,8 @@
+#HAULING v1
+
+CONTRACT: Junior | DIRECT Medium Haul | Baijini Point > Riker Memorial Spaceport [BP]*
+REWARD: 56,000 aUEC
+CONTRACTOR: Covalex Independent Contractors
+AVAILABILITY: 59m 17s
+MAXBOX: 8
+CARGO: 85 SCU | Silicon | Baijini Point above ArcCorp | Riker Memorial Spaceport in Area18

@@ -1,0 +1,14 @@
+Deliver 0/3 SCU of Aluminum (Ore) to Baijini Point above
+ArcCorp.
+Collect Aluminum (Ore) from Shubin Mining Facility
+SAL-5.
+Collect Aluminum (Ore) from Shubin Mining Facility
+SAL-2.
+Deliver 0/4 SCU of Tungsten (Ore) to Baijini Point above
+ArcCorp.
+Collect Tungsten (Ore) from Shubin Mining Facility
+SAL-5.
+Deliver 0/2 SCU of Corundum (Raw) to Baijini Point above
+ArcCorp.
+Collect Corundum (Raw) from Shubin Mining Facility
+SAL-2.

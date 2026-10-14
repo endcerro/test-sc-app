@@ -1,0 +1,11 @@
+#HAULING v1
+
+CONTRACT: DEAD SAINTS - Rookie | Interstellar Medium Haul | to Riker Memorial Spaceport [100 Rep]
+REWARD: 535,000 aUEC
+CONTRACTOR: Dead Saints
+AVAILABILITY: N/A
+MAXBOX: 2
+REP: 100
+CARGO: 4 SCU | [!] E'tam | Samson & Son's Salvage Center on Wala | Riker Memorial Spaceport in Area18
+CARGO: 2 SCU | [!] SLAM  | Seer's Canyon on Pyro 5b              | Riker Memorial Spaceport in Area18
+CARGO: 2 SCU | [!] Neon  | Seer's Canyon on Pyro 5b              | Riker Memorial Spaceport in Area18

@@ -1,0 +1,14 @@
+Deliver 0/32 SCU of Distilled Spirits to Teasa Spaceport
+in Lorville.
+Collect Distilled Spirits from Orbituary.
+Deliver 0/8 SCU of Diamond to Teasa Spaceport in
+Lorville.
+Collect Diamond from Orbituary.
+Deliver 0/16 SCU of Fresh Food to Teasa Spaceport in
+Lorville.
+Collect Fresh Food from Orbituary.
+Deliver 0/8 SCU of Gold to Teasa Spaceport in Lorville.
+Collect Gold from Orbituary.
+Deliver 0/2 SCU of Aphorite to Teasa Spaceport in
+Lorville.
+Collect Aphorite from Orbituary.

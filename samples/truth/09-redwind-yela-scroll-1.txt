@@ -1,0 +1,14 @@
+#HAULING v1
+
+# 09, shot 1 of 2: the top of a scrolled objective list.
+CONTRACT: Rookie | Interstellar Large Haul | from ArcCorp's Yela facility
+REWARD: 747,000 aUEC
+CONTRACTOR: Red Wind Linehaul
+AVAILABILITY: N/A
+MAXBOX: 16
+REP: 200
+CARGO: 32 SCU | Ship Ammunition | ArcCorp's Yela facility | Sunset Mesa on Pyro II
+CARGO: 32 SCU | Hydrogen | ArcCorp's Yela facility | Sunset Mesa on Pyro II
+CARGO: 20 SCU | Medical Supplies | ArcCorp's Yela facility | Sunset Mesa on Pyro II
+CARGO: 32 SCU | Ship Ammunition | ArcCorp's Yela facility | Chawla's Beach on Pyro IV
+CARGO: 32 SCU | Hydrogen | ArcCorp's Yela facility | Chawla's Beach on Pyro IV

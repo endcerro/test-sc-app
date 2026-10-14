@@ -1,0 +1,16 @@
+[package]
+name = "sc-contracts"
+description = "Hauling contract model, #HAULING truth format, parsers for OCR'd contract text and scoring. Pure, no IO."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sc-universe.workspace = true
+regex.workspace = true
+serde_json.workspace = true
+strsim.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

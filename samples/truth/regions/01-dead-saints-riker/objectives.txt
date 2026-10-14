@@ -1,0 +1,10 @@
+Deliver 0/4 SCU of [!] E'tam to Riker Memorial Spaceport
+in Area18.
+Collect [!] E'tam from Samson & Son's Salvage
+Center.
+Deliver 0/2 SCU of [!] SLAM to Riker Memorial Spaceport
+in Area18.
+Collect [!] SLAM from Seer's Canyon.
+Deliver 0/2 SCU of [!] Neon to Riker Memorial Spaceport
+in Area18.
+Collect [!] Neon from Seer's Canyon.

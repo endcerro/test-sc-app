@@ -1,0 +1,13 @@
+#HAULING v1
+
+CONTRACT: DEAD SAINTS -- Rookie Rank, Large Scale Cargo Run | Ruin Station > Grim HEX [100
+REWARD: 317,500 aUEC
+CONTRACTOR: Dead Saints
+AVAILABILITY: N/A
+MAXBOX: 16
+REP: 100
+CARGO: 80 SCU | Carbon                 | Ruin Station above Pyro VI | Grim HEX within Yela's asteroid belt
+CARGO: 16 SCU | [!] WiDoW              | Ruin Station above Pyro VI | Grim HEX within Yela's asteroid belt
+CARGO: 64 SCU | Potassium              | Ruin Station above Pyro VI | Grim HEX within Yela's asteroid belt
+CARGO: 18 SCU | Construction Materials | Ruin Station above Pyro VI | Grim HEX within Yela's asteroid belt
+CARGO: 2 SCU  | [!] Neon               | Ruin Station above Pyro VI | Grim HEX within Yela's asteroid belt

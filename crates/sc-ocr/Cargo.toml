@@ -1,0 +1,37 @@
+[package]
+name = "sc-ocr"
+description = "OCR of in-game screens: layout detection, image preprocessing and OCR engine adapters."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[features]
+# PaddleOCR (PP-OCR) ONNX models through ONNX Runtime (downloaded at build time by `ort`).
+paddle = ["dep:ort"]
+# ocrs: pure Rust OCR on the rten runtime.
+ocrs = ["dep:ocrs", "dep:rten"]
+# Windows built-in OCR (Windows.Media.Ocr). No-op on other platforms.
+winocr = ["dep:windows"]
+# Tesseract through its command-line tool (must be installed).
+tesseract = []
+all-engines = ["paddle", "ocrs", "winocr", "tesseract"]
+
+[dependencies]
+image.workspace = true
+thiserror.workspace = true
+ocrs = { version = "0.13", optional = true }
+ort = { version = "=2.0.0-rc.14", optional = true }
+rten = { version = "0.26", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", optional = true, features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+] }
+
+[lints]
+workspace = true

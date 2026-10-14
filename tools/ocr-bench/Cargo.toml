@@ -1,0 +1,35 @@
+[package]
+name = "ocr-bench"
+description = "Benchmark of OCR engines and preprocessing pipelines on in-game screenshots."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+# Engines are opt-in so `cargo test --workspace` (CI) needs no models or native runtimes:
+# cargo run -p ocr-bench --release --features all-engines -- run
+paddle = ["sc-ocr/paddle"]
+ocrs = ["sc-ocr/ocrs"]
+winocr = ["sc-ocr/winocr"]
+tesseract = ["sc-ocr/tesseract"]
+all-engines = ["paddle", "ocrs", "winocr", "tesseract"]
+
+[dependencies]
+sc-contracts.workspace = true
+sc-data.workspace = true
+sc-ocr.workspace = true
+sc-universe.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+directories.workspace = true
+image.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+strsim.workspace = true
+ureq.workspace = true
+
+[lints]
+workspace = true

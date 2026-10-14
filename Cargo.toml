@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["crates/sc-universe", "crates/sc-data", "apps/sc-companion"]
+members = [
+    "crates/sc-universe",
+    "crates/sc-data",
+    "crates/sc-contracts",
+    "crates/sc-ocr",
+    "apps/sc-companion",
+    "tools/ocr-bench",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,13 +18,19 @@ repository = "https://github.com/endcerro/test-sc-app"
 [workspace.dependencies]
 sc-universe = { path = "crates/sc-universe" }
 sc-data = { path = "crates/sc-data" }
+sc-contracts = { path = "crates/sc-contracts" }
+sc-ocr = { path = "crates/sc-ocr" }
 
 anyhow = "1.0"
 clap = { version = "4.6", features = ["derive"] }
 directories = "6.0"
 eframe = "0.33"
+image = { version = "0.25", default-features = false, features = ["png", "webp", "jpeg"] }
+rayon = "1.12"
+regex = "1.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
 strsim = "0.11"
 tempfile = "3.27"
 thiserror = "2.0"

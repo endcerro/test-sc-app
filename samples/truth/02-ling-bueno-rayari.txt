@@ -1,0 +1,9 @@
+#HAULING v1
+
+CONTRACT: Ling Family Rookie Haul - Small Scale | Bueno Ravine > Rayari Kaltag Research Outpost [100
+REWARD: 198,000 aUEC
+CONTRACTOR: Ling Family Hauling
+AVAILABILITY: N/A
+MAXBOX: 2
+CARGO: 4 SCU | Sunset Berries | Bueno Ravine on Pyro III | Rayari Kaltag Research Outpost on Calliope
+CARGO: 2 SCU | Golden Medmon  | Bueno Ravine on Pyro III | Rayari Kaltag Research Outpost on Calliope

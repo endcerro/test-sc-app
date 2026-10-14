@@ -1,0 +1,16 @@
+#HAULING v1
+
+# 09: scrolled objective list. -1 is the top, -2 is scrolled down (the list goes further).
+# The last Collect line is cut off in -2, so that pickup is written "?" (not seen yet).
+CONTRACT: Rookie | Interstellar Large Haul | from ArcCorp's Yela facility
+REWARD: 747,000 aUEC
+CONTRACTOR: Red Wind Linehaul
+AVAILABILITY: N/A
+MAXBOX: 16
+REP: 200
+CARGO: 32 SCU | Ship Ammunition | ArcCorp's Yela facility | Sunset Mesa on Pyro II
+CARGO: 32 SCU | Hydrogen | ArcCorp's Yela facility | Sunset Mesa on Pyro II
+CARGO: 20 SCU | Medical Supplies | ArcCorp's Yela facility | Sunset Mesa on Pyro II
+CARGO: 32 SCU | Ship Ammunition | ArcCorp's Yela facility | Chawla's Beach on Pyro IV
+CARGO: 32 SCU | Hydrogen | ArcCorp's Yela facility | Chawla's Beach on Pyro IV
+CARGO: 20 SCU | Medical Supplies | ArcCorp's Yela facility? | Chawla's Beach on Pyro IV

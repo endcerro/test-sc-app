@@ -1,0 +1,13 @@
+#HAULING v1
+
+CONTRACT: Rookie | DIRECT Interstellar Bulk Haul | Orbituary > Teasa Spaceport
+REWARD: 308,250 aUEC
+CONTRACTOR: Red Wind Linehaul
+AVAILABILITY: N/A
+MAXBOX: 8
+REP: 200
+CARGO: 32 SCU | Distilled Spirits | Orbituary above Pyro III | Teasa Spaceport in Lorville
+CARGO: 8 SCU  | Diamond           | Orbituary above Pyro III | Teasa Spaceport in Lorville
+CARGO: 16 SCU | Fresh Food        | Orbituary above Pyro III | Teasa Spaceport in Lorville
+CARGO: 8 SCU  | Gold              | Orbituary above Pyro III | Teasa Spaceport in Lorville
+CARGO: 2 SCU  | Aphorite          | Orbituary above Pyro III | Teasa Spaceport in Lorville

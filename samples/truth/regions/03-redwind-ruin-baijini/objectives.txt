@@ -1,0 +1,14 @@
+Deliver 0/168 SCU of Ammonia to Baijini Point above
+ArcCorp.
+Collect Ammonia from Ruin Station.
+Deliver 0/168 SCU of Hydrogen Fuel to Baijini Point above
+ArcCorp.
+Collect Hydrogen Fuel from Ruin Station.
+Deliver 0/48 SCU of Argon to Baijini Point above ArcCorp.
+Collect Argon from Ruin Station.
+Deliver 0/48 SCU of Pressurized Ice to Baijini Point above
+ArcCorp.
+Collect Pressurized Ice from Ruin Station.
+Deliver 0/20 SCU of Construction Materials to Baijini
+Point above ArcCorp.
+Collect Construction Materials from Ruin Station.

@@ -5,8 +5,13 @@
 ```text
 apps/sc-companion  ──►  sc-data  ──►  sc-universe
       (bin)            (sources,        (model, pure)
-                        cache, http)
+                        cache, http)        ▲
+                                            │ normalize, find_fuzzy
+tools/ocr-bench ──► sc-ocr        sc-contracts
+      (bin)        (pixels → text)  (text → HaulingContract, pure)
 ```
+
+- **sc-contracts** / **sc-ocr** / **tools/ocr-bench**: contract OCR, see `docs/ocr.md`.
 
 - **sc-universe**: no IO. Owns the model and all algorithms on it (tree queries, distances,
   routing, name lookup). Everything else depends on it.
@@ -143,4 +148,6 @@ labels-derived) are resolved against the kept nodes (`scunpacked/aliases.rs`).
 - More aliases: UEX terminal names, common abbreviations; map `trade_locations` UUIDs (hauling
   contracts) onto locations.
 - More panes (trading, OCR); map overlays for routes once the optimizer exists.
-- OCR crate and the cargo route optimizer on top of `Universe::route`.
+- Screen capture + the recommended OCR pipeline (`docs/ocr.md`) in the app; commodity
+  terminal screens; the cargo route optimizer on top of `Universe::route` and
+  `HaulingContract`.

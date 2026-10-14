@@ -1,0 +1,15 @@
+Deliver 0/32 SCU of Hydrogen to Sunset Mesa on Pyro II.
+Collect Hydrogen from ArcCorp's Yela facility.
+Deliver 0/20 SCU of Medical Supplies to Sunset Mesa on
+Pyro II.
+Collect Medical Supplies from ArcCorp's Yela
+facility.
+Deliver 0/32 SCU of Ship Ammunition to Chawla's Beach
+on Pyro IV.
+Collect Ship Ammunition from ArcCorp's Yela
+facility.
+Deliver 0/32 SCU of Hydrogen to Chawla's Beach on Pyro
+IV.
+Collect Hydrogen from ArcCorp's Yela facility.
+Deliver 0/20 SCU of Medical Supplies to Chawla's Beach
+on Pyro IV.

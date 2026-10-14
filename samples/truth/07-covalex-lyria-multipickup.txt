@@ -1,0 +1,10 @@
+#HAULING v1
+
+CONTRACT: Junior Rank - Small Cargo Haul
+REWARD: 59,750 aUEC
+CONTRACTOR: Covalex Independent Contractors
+AVAILABILITY: 1h 4m
+MAXBOX: 4
+CARGO: 3 SCU | Aluminum (Ore) | Shubin Mining Facility SAL-5 on Lyria + Shubin Mining Facility SAL-2 on Lyria | Baijini Point above ArcCorp
+CARGO: 4 SCU | Tungsten (Ore) | Shubin Mining Facility SAL-5 on Lyria | Baijini Point above ArcCorp
+CARGO: 2 SCU | Corundum (Raw) | Shubin Mining Facility SAL-2 on Lyria | Baijini Point above ArcCorp

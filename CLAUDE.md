@@ -9,12 +9,13 @@ Roadmap:
 
 1. **Universe data** (done): location tree + coordinates + distances, fetched once at launch.
 2. **OCR** of in-game screens (commodity terminals, contracts) → resolve names to locations.
+   Hauling contract screens: parsing + engine/preprocessing benchmark done (`docs/ocr.md`).
 3. **Cargo route optimizer** fed by OCR'd prices and the universe distances.
 4. **GUI** with egui/eframe (`apps/sc-companion`): pane shell + **Map** pane done; other panes
    (trading, OCR) come with their tools.
 
 Read `docs/architecture.md` (design) and `docs/data-sources.md` (where the data comes from,
-file schemas, quirks) before changing the data layer.
+file schemas, quirks) before changing the data layer, and `docs/ocr.md` before changing OCR.
 
 ## Workspace
 
@@ -24,6 +25,10 @@ file schemas, quirks) before changing the data layer.
 | `crates/sc-data` | Data sources → `Universe`. `ScunpackedSource` (local dir or GitHub + disk cache), `HttpClient` trait, `Cache`, aliases (`scunpacked/aliases.rs`). |
 | `crates/sc-data/data/aliases.json` | Hand-maintained aliases (embedded), keyed by starmap UUID. |
 | `crates/sc-data/tests/fixtures/scunpacked` | Trimmed real scunpacked files (game 4.10.2) used by offline tests. |
+| `crates/sc-contracts` | Pure: `HaulingContract` model, `#HAULING v1` truth format (`truth`), OCR text -> contract (`parse`, `repair`), scrolled-shot merge (`merge`), name snapping (`snap`, embedded `data/commodities.json`), scoring (`score`). **No IO.** |
+| `crates/sc-ocr` | Pixels -> text. `layout` (regions in a 1920x1080 reference frame, OFFERS-tab anchor, yellow bullet detection), `preprocess` (`Pipeline`: colour mask, top-hat, binarise, scale, despeckle, invert), `engine` (`OcrEngine` trait; `paddle`, `ocrs`, `winocr`, `tesseract` adapters behind features), `models` (pinned model URLs + sha256). |
+| `tools/ocr-bench` | OCR benchmark: grid over engines x pipelines x crop modes, result cache, CER + end-to-end scoring, `summary.md` reports. Engines are opt-in features. |
+| `samples/` | Contract screenshots, `truth/<stem>.txt` (`#HAULING v1`), `truth/regions/<stem>/<region>.txt` (exact region text). |
 | `apps/sc-companion` | Binary. No subcommand → eframe GUI (`src/gui/`); subcommands → CLI inspector (`src/cli.rs`: `summary`, `tree`, `find`, `dist`, `trading`). |
 | `apps/sc-companion/src/gui/map` | Map pane: `camera` (f64 orthographic 2D/3D projection), `scene` (pure what-to-draw + LOD, tested), `paint`, `style`, `inspector`. |
 
@@ -44,6 +49,11 @@ cargo run -p sc-companion -- dist Lorville "Ruin Station"
 cargo run -p sc-companion -- find "riker memorial spaceport"        # alias -> Area18
 cargo run -p sc-companion -- tree --depth 12 --aliases | grep -B1 " = "   # review aliases
 cargo run -p sc-companion -- --data-dir /path/to/scunpacked-data summary   # offline
+cargo run -p ocr-bench --release --features all-engines -- fetch-models   # once (network)
+cargo run -p ocr-bench --release --features all-engines -- run --preset quick      # ~5 min
+cargo run -p ocr-bench --release --features all-engines -- run --universe          # reduced, ~25 min
+cargo run -p ocr-bench --release --features all-engines -- run --universe --preset full --name full  # overnight, resumable
+cargo run -p ocr-bench --release -- dump --sample 05                      # crops for inspection
 ```
 
 CI (`.github/workflows/ci.yml`) runs fmt check, clippy `-D warnings` and tests.
@@ -67,6 +77,10 @@ CI (`.github/workflows/ci.yml`) runs fmt check, clippy `-D warnings` and tests.
 - Tests are offline by default. Network tests are `#[ignore]` with a reason.
 - When changing classification/filters/alias rules, re-check real data with the CLI
   (`summary`, `tree --aliases`, `find`) and keep `docs/data-sources.md` in sync.
+- OCR engines are cargo features, **off by default**, so CI needs no models, ONNX Runtime or
+  Windows APIs. Text interpretation belongs in `sc-contracts`, not in engine adapters. After
+  changing parsing, re-run `run` (cached OCR text is reused, only scoring reruns); after
+  changing layout, pipelines or adapters, bump `CACHE_VERSION` in `tools/ocr-bench/src/grid.rs`.
 - Workspace edition 2024, MSRV 1.89 (set by `uuid`).
 
 ## Data notes (short version)
